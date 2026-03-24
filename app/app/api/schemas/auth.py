@@ -1,42 +1,29 @@
-"""Auth response shapes — contracts/auth-responses.schema.json."""
+"""Pydantic shapes aligned with `contracts/auth-*.schema.json` and `me-response.schema.json`."""
 
-from __future__ import annotations
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field
+
+from app.schemas.user_settings import UserSettings
 
 
-class RegisterRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AuthEmailPasswordBody(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(..., min_length=1, max_length=1024)
 
 
-class LoginRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    email: EmailStr
-    password: str = Field(min_length=1)
-
-
-class UserPublic(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class UserSummary(BaseModel):
     id: str
-    email: str
+    email: EmailStr
 
 
-class TokenResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
+class AuthTokenResponse(BaseModel):
     access_token: str
-    token_type: str = "bearer"
+    token_type: Literal["bearer"] = "bearer"
     expires_in: int
-    user: UserPublic
+    user: UserSummary
 
 
 class MeResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    user: UserPublic
-    settings: dict
+    user: UserSummary
+    settings: UserSettings

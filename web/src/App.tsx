@@ -1,18 +1,23 @@
 import { Link, Navigate, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
+import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { useAuth } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { CalendarPage } from "./pages/CalendarPage";
-import { Dashboard } from "./pages/Dashboard";
+import { DashboardPage } from "./pages/DashboardPage";
 import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { HistoryPage } from "./pages/HistoryPage";
-import { LoginPage } from "./pages/Login";
+import { LoginPage } from "./pages/LoginPage";
 import { RecordPage } from "./pages/RecordPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import AdminPage from "./pages/AdminPage";
 
-export function App() {
+const apiBase = import.meta.env.VITE_API_URL ?? "";
+
+export default function App() {
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { token, logout } = useAuth();
 
   const navCls = ({ isActive }: { isActive: boolean }) =>
     isActive ? "nav-link nav-link--active" : "nav-link";
@@ -46,15 +51,26 @@ export function App() {
           ) : null}
           <span className="nav-spacer" />
           {token ? (
+    <div style={{ fontFamily: "system-ui, sans-serif", padding: "1.5rem", maxWidth: 880 }}>
+      <header style={{ marginBottom: "1.5rem" }}>
+        <h1 style={{ fontSize: "1.25rem", fontWeight: 600 }}>Journal</h1>
+        <nav style={{ display: "flex", gap: "1rem", marginTop: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+          <Link to="/">Dashboard</Link>
+          <Link to="/record">Record</Link>
+          <Link to="/history">History</Link>
+          <Link to="/calendar">Calendar</Link>
+          <Link to="/settings">Settings</Link>
+          {user?.is_admin && <Link to="/admin" style={{ color: "#4338ca", fontWeight: 600 }}>Admin</Link>}
+          {user ? (
             <button
               type="button"
               className="nav-logout"
               onClick={() => {
                 logout();
-                navigate("/", { replace: true });
+                navigate("/login", { replace: true });
               }}
             >
-              Log out
+              Log out {user.email ? `(${user.email})` : ""}
             </button>
           ) : (
             <Link to="/login" className="nav-link">
@@ -62,10 +78,13 @@ export function App() {
             </Link>
           )}
         </nav>
+        {apiBase && (
+          <p style={{ fontSize: "0.85rem", color: "#555", marginTop: "0.5rem" }}>API: {apiBase}</p>
+        )}
       </header>
       <main className="app-main">
       <Routes>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<DashboardPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route
@@ -97,6 +116,14 @@ export function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPage />
             </ProtectedRoute>
           }
         />

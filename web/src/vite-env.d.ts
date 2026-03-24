@@ -1,7 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_API_URL: string;
+  /** Empty in dev when using Vite proxy to the API; set in Docker build for production. */
+  readonly VITE_API_URL?: string;
 }
 
 interface ImportMeta {

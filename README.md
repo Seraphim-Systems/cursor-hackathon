@@ -79,7 +79,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 | OpenAPI | http://localhost:8000/api/docs |
 | Health | http://localhost:8000/api/health |
 
-The Python package is mounted from [`app/app/`](app/app/); the web app from [`web/`](web/). `web` uses a container `node_modules` volume so the host does not need `npm install`.
+The Python package is mounted from [`app/app/`](app/app/); the web app from [`web/`](web/). The `web` service uses a container-only `node_modules` volume — **do not run `npm install` or `npm` on the host**; use Compose (or `docker compose build web` for a production bundle check).
 
 ## API tests
 
@@ -95,9 +95,19 @@ cd app && source .venv/bin/activate && pytest
 docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app pytest
 ```
 
-## Regenerating `web/package-lock.json` (optional)
+## Web dependencies (`npm` only inside Docker)
 
-Only when `package.json` dependencies change. From repo root (**no local Node**):
+**Do not install Node/npm on the host** for this project. Production UI builds run in [`web/Dockerfile`](web/Dockerfile); dev uses [`web/Dockerfile.dev`](web/Dockerfile.dev) via [`docker-compose.dev.yml`](docker-compose.dev.yml).
+
+To verify a production build:
+
+```bash
+docker compose build web
+```
+
+### Regenerating `web/package-lock.json` (optional)
+
+Only when [`web/package.json`](web/package.json) dependencies change — still **without** local npm:
 
 ```bash
 docker run --rm -v "$(pwd)/web:/app" -w /app node:20-alpine sh -c "npm install"

@@ -1,13 +1,25 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
-from typing import Any
 
+from beanie import init_beanie
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
 
-from app.api.routers import auth, calendar, entries, projects, settings as settings_router
+from app.api.routers import admin, auth, calendar, entries, projects, settings as settings_router
 from app.config import settings
-from app.infrastructure.adapters import build_analyzer, build_transcriber
+from app.infrastructure.adapters.registry import build_analyzer, build_transcriber
 from app.infrastructure.persistence.beanie_app import init_beanie_for_app, mongo_ping_ok
+from app.infrastructure.persistence.documents import (
+    JournalEntryDocument,
+    ProjectDocument,
+    UserDocument,
+)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -39,11 +51,12 @@ app.include_router(settings_router.router, prefix="/api")
 app.include_router(entries.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")
 app.include_router(calendar.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 
 @app.get("/api/health")
-async def health(request: Request) -> dict[str, Any]:
-    """Liveness, database ping, active adapters (see data contracts §Health)."""
+async def health(request: Request) -> dict:
+    """Liveness; DB connectivity + active transcription / analysis adapters."""
     transcriber = build_transcriber(settings)
     analyzer = build_analyzer(settings)
     database = "disconnected"

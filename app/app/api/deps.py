@@ -1,53 +1,57 @@
-"""FastAPI dependencies."""
-
-from __future__ import annotations
-
 from typing import Annotated
 
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 
-from app.application.facades.auth_facade import AuthFacade
 from app.config import settings
-from app.domain.protocols import IAIAnalyzer, IAudioStorage, ITranscriber
-from app.infrastructure.adapters import build_analyzer, build_audio_storage, build_transcriber
+from app.infrastructure.adapters.registry import build_analyzer, build_transcriber
+from app.infrastructure.adapters.local_audio_storage import LocalAudioStorage
 from app.infrastructure.persistence.documents import UserDocument
 from app.infrastructure.persistence.repositories import UserRepository
-from app.api.security import decode_subject
+from app.infrastructure.security.jwt_tokens import decode_subject
 
-bearer_scheme = HTTPBearer(auto_error=True)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+_users = UserRepository()
 
 
-async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)],
-) -> UserDocument:
-    try:
-        uid = decode_subject(credentials.credentials)
-    except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user = await UserRepository().get_by_id(uid)
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserDocument:
+    sub = decode_subject(token)
+    if sub is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user = await _users.find_by_id(sub)
     if user is None:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+async def get_current_admin(user: UserDocument = Depends(get_current_user)) -> UserDocument:
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
     return user
 
 
 UserDep = Annotated[UserDocument, Depends(get_current_user)]
+AdminDep = Annotated[UserDocument, Depends(get_current_admin)]
 
 
-def get_analyzer() -> IAIAnalyzer:
-    return build_analyzer(settings)
+def get_audio_storage() -> LocalAudioStorage:
+    return LocalAudioStorage(settings.audio_storage_path)
 
 
-def get_audio_storage() -> IAudioStorage:
-    return build_audio_storage(settings)
-
-
-def get_transcriber() -> ITranscriber:
+def get_transcriber():
     return build_transcriber(settings)
 
 
-def get_auth_facade() -> AuthFacade:
-    return AuthFacade(users=UserRepository())
-
-
-AuthFacadeDep = Annotated[AuthFacade, Depends(get_auth_facade)]
+def get_analyzer():
+    return build_analyzer(settings)
