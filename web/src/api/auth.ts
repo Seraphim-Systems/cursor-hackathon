@@ -1,4 +1,4 @@
-import { apiJson } from "./client";
+import { apiFetch } from "./client";
 
 /** Aligns with [`contracts/auth-responses.schema.json`](../../contracts/auth-responses.schema.json). */
 export type AuthTokenResponse = {
@@ -15,12 +15,12 @@ export type MeResponse = {
 };
 
 export async function loginRequest(email: string, password: string): Promise<AuthTokenResponse> {
-  return apiJson<AuthTokenResponse>("/api/auth/login", {
+  return apiFetch<AuthTokenResponse>("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
 }
 
 export async function fetchMe(): Promise<MeResponse> {
-  return apiJson<MeResponse>("/api/auth/me", { method: "GET" });
+  return apiFetch<MeResponse>("/api/auth/me", { method: "GET" });
 }

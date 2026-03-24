@@ -1,37 +1,31 @@
-"""Repositories for Beanie documents."""
-
-from __future__ import annotations
-
-from typing import Any
-
-from beanie import PydanticObjectId
-
-from app.infrastructure.persistence.documents import UserDocument
-from app.schemas.user_settings import UserSettings
-
-from app.infrastructure.persistence.documents import JournalEntryDocument, ProjectDocument, UserDocument
-from app.infrastructure.persistence.documents import JournalEntryDocument, UserDocument
-from app.infrastructure.persistence.project_document import ProjectDocument
 from __future__ import annotations
 
 from datetime import date, datetime, time, timezone
-"""Repositories for Beanie documents."""
-
-from __future__ import annotations
-
 from typing import Any
 
 from beanie import PydanticObjectId
+
+from app.infrastructure.persistence.documents import (
+    JournalEntryDocument,
+    ProjectDocument,
+    UserDocument,
+)
+from app.schemas.user_settings import UserSettings
 
 
 def normalize_email(email: str) -> str:
     """Lowercase + trim for unique index and lookups (case-insensitive identity)."""
-
     return email.strip().lower()
 
 
+def oid(val: str | PydanticObjectId) -> PydanticObjectId:
+    if isinstance(val, PydanticObjectId):
+        return val
+    return PydanticObjectId(val)
+
+
 class UserRepository:
-    """CRUD for `UserDocument` (unique index on `email`)."""
+    """CRUD for `UserDocument`."""
 
     async def create(
         self,
@@ -52,16 +46,18 @@ class UserRepository:
         return await UserDocument.find_one(UserDocument.email == normalize_email(email))
 
     async def find_by_id(self, user_id: str | PydanticObjectId) -> UserDocument | None:
-        return await UserDocument.get(user_id)
+        try:
+            return await UserDocument.get(oid(user_id))
+        except (ValueError, TypeError):
+            return None
 
     async def patch_settings(
         self,
         user_id: str | PydanticObjectId,
         partial: dict[str, Any],
     ) -> UserDocument | None:
-        """Merge partial settings (JSON Merge Patch–style merge; extra keys allowed per contract)."""
-
-        user = await UserDocument.get(user_id)
+        """Merge partial settings (JSON Merge Patch–style merge)."""
+        user = await self.find_by_id(user_id)
         if user is None:
             return None
         current = user.settings.model_dump()
@@ -71,27 +67,25 @@ class UserRepository:
         await user.save()
         return user
 
-def oid(val: str) -> PydanticObjectId:
-    return PydanticObjectId(val)
-
-
-class UserRepository:
-    async def get_by_id(self, user_id: str) -> UserDocument | None:
-        try:
-            return await UserDocument.get(oid(user_id))
-        except (ValueError, TypeError):
-            return None
-
-    async def get_by_email(self, email: str) -> UserDocument | None:
-        return await UserDocument.find_one(UserDocument.email == email.lower().strip())
-
-    async def create(self, *, email: str, hashed_password: str) -> UserDocument:
-        user = UserDocument(email=email.lower().strip(), hashed_password=hashed_password)
-        await user.insert()
-        return user
-
 
 class JournalEntryRepository:
+    """CRUD for `JournalEntryDocument`."""
+
+    async def create(
+        self,
+        *,
+        user_id: str,
+        content: str,
+        title: str = "",
+    ) -> JournalEntryDocument:
+        doc = JournalEntryDocument(
+            user_id=user_id,
+            content=content,
+            title=title,
+        )
+        await doc.insert()
+        return doc
+
     async def get_for_user(self, entry_id: str, user_id: str) -> JournalEntryDocument | None:
         try:
             doc = await JournalEntryDocument.get(oid(entry_id))
@@ -131,16 +125,27 @@ class JournalEntryRepository:
 
 
 class ProjectRepository:
-    async def find_by_normalized(self, user_id: str, normalized: str) -> ProjectDocument | None:
-        return await ProjectDocument.find_one(
-            ProjectDocument.user_id == user_id,
-            ProjectDocument.normalized_name == normalized,
+    """CRUD for `ProjectDocument`."""
+
+    async def create(
+        self,
+        *,
+        user_id: str,
+        name: str,
+        description: str = "",
+    ) -> ProjectDocument:
+        doc = ProjectDocument(
+            user_id=user_id,
+            name=name,
+            description=description,
         )
+        await doc.insert()
+        return doc
 
     async def list_for_user(self, user_id: str) -> list[ProjectDocument]:
         return (
             await ProjectDocument.find(ProjectDocument.user_id == user_id)
-            .sort(-ProjectDocument.last_mentioned_at)
+            .sort(-ProjectDocument.created_at)
             .to_list()
         )
 
@@ -152,53 +157,3 @@ class ProjectRepository:
         if doc is None or doc.user_id != user_id:
             return None
         return doc
-from app.infrastructure.persistence.documents import UserDocument
-from app.schemas.user_settings import UserSettings
-
-
-def normalize_email(email: str) -> str:
-    """Lowercase + trim for unique index and lookups (case-insensitive identity)."""
-
-    return email.strip().lower()
-
-
-class UserRepository:
-    """CRUD for `UserDocument` (unique index on `email`)."""
-
-    async def create(
-        self,
-        *,
-        email: str,
-        hashed_password: str,
-        settings: UserSettings | None = None,
-    ) -> UserDocument:
-        doc = UserDocument(
-            email=normalize_email(email),
-            hashed_password=hashed_password,
-            settings=settings or UserSettings(),
-        )
-        await doc.insert()
-        return doc
-
-    async def find_by_email(self, email: str) -> UserDocument | None:
-        return await UserDocument.find_one(UserDocument.email == normalize_email(email))
-
-    async def find_by_id(self, user_id: str | PydanticObjectId) -> UserDocument | None:
-        return await UserDocument.get(user_id)
-
-    async def patch_settings(
-        self,
-        user_id: str | PydanticObjectId,
-        partial: dict[str, Any],
-    ) -> UserDocument | None:
-        """Merge partial settings (JSON Merge Patch–style merge; extra keys allowed per contract)."""
-
-        user = await UserDocument.get(user_id)
-        if user is None:
-            return None
-        current = user.settings.model_dump()
-        for key, value in partial.items():
-            current[key] = value
-        user.settings = UserSettings.model_validate(current)
-        await user.save()
-        return user
