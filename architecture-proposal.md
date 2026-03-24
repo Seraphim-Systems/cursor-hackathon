@@ -1,9 +1,9 @@
 ---
 name: Dockerized Journal App
-overview: "Greenfield implementation of a containerized journaling system: React (Vite) frontend, FastAPI backend with layered hexagonal-style packaging (domain / application facades / infrastructure adapters & repositories), MongoDB via Beanie for ORM-like NoSQL access, pluggable transcription and AI providers, JWT auth, and Docker Compose with persistent audio volumes."
+overview: "Greenfield implementation of a containerized journaling system: React (Vite) web client, FastAPI service (`app/`) with layered hexagonal-style packaging (domain / application facades / infrastructure adapters & repositories), MongoDB via Beanie for ORM-like NoSQL access, pluggable transcription and AI providers, JWT auth, and Docker Compose with persistent audio volumes."
 todos:
   - id: compose-db-backend
-    content: Add Docker Compose (mongo, backend, frontend), backend Dockerfile, Beanie init, health/mongodb connectivity. Add extendable composes, a local dev testing and a deployment compose with production values and tighter security.
+    content: Add Docker Compose (mongo, app, web), app Dockerfile, Beanie init, health/mongodb connectivity. Add extendable composes, a local dev testing and a deployment compose with production values and tighter security.
     status: pending
   - id: auth-settings
     content: Implement User/Settings documents, JWT auth routes, password hashing, protected dependencies
@@ -89,7 +89,7 @@ flowchart TB
 
 ## Backend package layout (proposed)
 
-Under something like `[backend/app/](backend/app/)` or `[backend/journal_api/](backend/journal_api/)`:
+Under something like `[app/app/](app/app/)` or `[app/journal_api/](app/journal_api/)`:
 
 - `**domain/**` — Pure types and rules: entry status enums, `InsightPayload` (dataclass/Pydantic-free or shared model), `ProjectMatcher` / “genuinely new project” heuristic (e.g. normalized name not in user’s existing project set; optional similarity threshold). **Protocols** (`typing.Protocol`) for `ITranscriber`, `IAIAnalyzer`, `IAudioStorage`, `IClock` (testability).
 - `**application/`** — Use-case style services if needed; `**facades/`** — thin orchestration only (create entry, pipeline audio→transcribe→analyze, re-analyze, list/filter).
@@ -118,11 +118,11 @@ Under something like `[backend/app/](backend/app/)` or `[backend/journal_api/](b
 - **Calendar:** `GET /api/calendar?from=...&to=...` — return per-day aggregates (`date`, `entry_ids` or counts) for browsing
 - **Settings:** `GET/PATCH /api/settings`
 
-Serve OpenAPI at `/docs` for frontend typing (optional codegen later).
+Serve OpenAPI at `/docs` for `web/` typing (optional codegen later).
 
 ## Frontend structure (proposed)
 
-Under `[frontend/](frontend/)`:
+Under `[web/](web/)`:
 
 - `**src/pages/`** — `Login`, `Register` (if included), `Dashboard`, `RecordEntry`, `JournalHistory`, `Calendar`, `EntryDetail`, `Settings`
 - `**src/api/`** — `fetch` wrapper with JWT header from context/storage
@@ -133,11 +133,11 @@ Under `[frontend/](frontend/)`:
 
 ## Docker and Compose
 
-- `**[docker-compose.yml](docker-compose.yml)`** — services: `mongo`, `backend`, `frontend`, optional `mongo-express` *only for dev* (omit in prod)
+- `**[docker-compose.yml](docker-compose.yml)`** — services: `mongo`, `app`, `web`, optional `mongo-express` *only for dev* (omit in prod)
 - **Backend Dockerfile** — multi-stage: install deps, copy app, `uvicorn` entrypoint; env: `MONGODB_URI`, `JWT_SECRET`, `AUDIO_STORAGE_PATH`, `OPENAI_API_KEY` (optional), transcription/AI provider toggles
 - **Frontend Dockerfile** — multi-stage: `npm ci`, `vite build`, **nginx** serving `dist/` with SPA fallback
 - **Volumes:** named volume for Mongo data; named volume (or bind mount) for `**/data/audio`**
-- **Networking:** frontend calls backend via `VITE_API_URL` (build-time) pointing to same Compose network (`http://backend:8000`)
+- **Networking:** browser calls API via `VITE_API_URL` (build-time); containers reach API at `http://app:8000` on the Compose network
 
 ## Configuration and secrets
 
@@ -164,7 +164,7 @@ Under `[frontend/](frontend/)`:
 
 ## Files to add (initial milestone)
 
-- `[docker-compose.yml](docker-compose.yml)`, `[backend/Dockerfile](backend/Dockerfile)`, `[frontend/Dockerfile](frontend/Dockerfile)`
+- `[docker-compose.yml](docker-compose.yml)`, `[app/Dockerfile](app/Dockerfile)`, `[web/Dockerfile](web/Dockerfile)`
 - Backend: `pyproject.toml` or `requirements.txt`, FastAPI app factory, package layout as above
 - Frontend: Vite template files, env example
 - Root `[.env.example](.env.example)`

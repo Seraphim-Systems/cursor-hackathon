@@ -1,9 +1,9 @@
 ---
 name: Dockerized Journal App
-overview: "Greenfield implementation of a containerized journaling system: React (Vite) frontend, FastAPI backend with layered hexagonal-style packaging (domain / application facades / infrastructure adapters & repositories), MongoDB via Beanie for ORM-like NoSQL access, pluggable transcription and AI providers, JWT auth, and Docker Compose with persistent audio volumes."
+overview: "Greenfield implementation of a containerized journaling system: React (Vite) web client, FastAPI service in `app/` with layered hexagonal-style packaging (domain / application facades / infrastructure adapters & repositories), MongoDB via Beanie for ORM-like NoSQL access, pluggable transcription and AI providers, JWT auth, and Docker Compose with persistent audio volumes."
 todos:
   - id: compose-db-backend
-    content: Add Docker Compose (mongo, backend, frontend), backend Dockerfile, Beanie init, health/mongodb connectivity. Add extendable composes, a local dev testing and a deployment compose with production values and tighter security.
+    content: Add Docker Compose (mongo, app, web), app Dockerfile, Beanie init, health/mongodb connectivity. Add extendable composes, local dev testing, deployment with secrets via `.env` / CI git secrets.
     status: pending
   - id: auth-settings
     content: Implement User/Settings documents, JWT auth routes, password hashing, protected dependencies
@@ -17,8 +17,8 @@ todos:
   - id: projects-calendar
     content: Project auto upsert from insights + REST projects/calendar endpoints
     status: pending
-  - id: frontend-pages
-    content: "React Vite app: auth, dashboard, record, history, calendar, entry detail (edit insights + re-analyze), settings"
+  - id: web-pages
+    content: "React Vite app in web/: auth, dashboard, record, history, calendar, entry detail (edit insights + re-analyze), settings"
     status: pending
   - id: tests-docs-env
     content: pytest for domain/facades with mocks; .env.example; README run instructions
@@ -89,11 +89,11 @@ flowchart TB
 
 ## Backend package layout (proposed)
 
-Under something like `[backend/app/](backend/app/)` or `[backend/journal_api/](backend/journal_api/)`:
+Under something like `[app/app/](app/app/)` or `[app/journal_api/](app/journal_api/)`:
 
 - `**domain/**` — Pure types and rules: entry status enums, `InsightPayload` (dataclass/Pydantic-free or shared model), `ProjectMatcher` / “genuinely new project” heuristic (e.g. normalized name not in user’s existing project set; optional similarity threshold). **Protocols** (`typing.Protocol`) for `ITranscriber`, `IAIAnalyzer`, `IAudioStorage`, `IClock` (testability).
 - `**application/`** — Use-case style services if needed; `**facades/`** — thin orchestration only (create entry, pipeline audio→transcribe→analyze, re-analyze, list/filter).
-- `**infrastructure/**` — Beanie **document models** (collections), **repository** classes implementing small interfaces (e.g. `JournalEntryRepository`, `UserRepository`, `ProjectRepository`), **adapters** (`OpenAITranscriber`, `NoOpTranscriber`, `StructuredLLMClient`, `LocalAudioStorage`).
+- `**infrastructure/`** — Beanie **document models** (collections), **repository** classes implementing small interfaces (e.g. `JournalEntryRepository`, `UserRepository`, `ProjectRepository`), **adapters** (`OpenAITranscriber`, `NoOpTranscriber`, `StructuredLLMClient`, `LocalAudioStorage`).
 - `**api/`** — Routers, dependencies (`get_current_user`), request/response DTOs, exception handlers.
 
 **Facades** should be the only entry points the HTTP layer calls, keeping routers thin (map DTOs ↔ facade calls).
@@ -103,7 +103,7 @@ Under something like `[backend/app/](backend/app/)` or `[backend/journal_api/](b
 **Collections (Beanie documents):**
 
 1. `**UserDocument`** — `email`, `hashed_password`, embedded or linked `**UserSettings`** (timezone, default recording quality, notification prefs, theme, etc.).
-2. `**JournalEntryDocument**` — `user_id`, `created_at`, `updated_at`, `source: text|audio`, `audio_storage_key` (path or key), `transcript`, `cleaned_text`, `summary`, `sentiment` (float or enum + score), `**insights**` subdocument: `key_points`, `projects` (strings or `{name, notes}`), `goals`, `blockers`, `people`, `priorities`, `themes`. Add `**insights_field_locks**` or `**user_edited_insight_keys: set[str]**` so **re-run analysis** can overwrite only unlocked fields (practical UX for “editable + re-run”).
+2. `**JournalEntryDocument`** — `user_id`, `created_at`, `updated_at`, `source: text|audio`, `audio_storage_key` (path or key), `transcript`, `cleaned_text`, `summary`, `sentiment` (float or enum + score), `**insights`** subdocument: `key_points`, `projects` (strings or `{name, notes}`), `goals`, `blockers`, `people`, `priorities`, `themes`. Add `**insights_field_locks`** or `**user_edited_insight_keys: set[str]**` so **re-run analysis** can overwrite only unlocked fields (practical UX for “editable + re-run”).
 3. `**ProjectDocument`** — `user_id`, `name` (normalized slug for dedup), `title`, optional `description`, `first_seen_at`, `last_mentioned_at`, `related_entry_ids[]` (cap length in application layer to avoid unbounded arrays), `status` optional.
 
 **Project auto-create/update (simple rule):** After AI returns candidate projects, a small **domain/application** function compares normalized names to existing `ProjectDocument`s for that user; **create** if new and non-trivial (non-empty, not duplicate); **update** `last_mentioned_at` and append `entry_id` when meaningful. Avoid graph DB or heavy entity-resolution.
@@ -118,26 +118,26 @@ Under something like `[backend/app/](backend/app/)` or `[backend/journal_api/](b
 - **Calendar:** `GET /api/calendar?from=...&to=...` — return per-day aggregates (`date`, `entry_ids` or counts) for browsing
 - **Settings:** `GET/PATCH /api/settings`
 
-Serve OpenAPI at `/docs` for frontend typing (optional codegen later).
+Serve OpenAPI at `/docs` for `web/` typing (optional codegen later).
 
 ## Frontend structure (proposed)
 
-Under `[frontend/](frontend/)`:
+Under `[web/](web/)`:
 
 - `**src/pages/`** — `Login`, `Register` (if included), `Dashboard`, `RecordEntry`, `JournalHistory`, `Calendar`, `EntryDetail`, `Settings`
 - `**src/api/`** — `fetch` wrapper with JWT header from context/storage
-- `**src/components/**` — layout, audio recorder (MediaRecorder API), entry cards, insight editor (structured form bound to nested JSON), calendar grid
+- `**src/components/`** — layout, audio recorder (MediaRecorder API), entry cards, insight editor (structured form bound to nested JSON), calendar grid
 - **Routing** — protected routes wrapper reading auth state
 
 **UX notes:** Record page: record → upload → show progress (transcribing / analyzing) → redirect to entry detail. Entry detail: editable fields + “Re-run AI analysis” with clear note about locked fields. History: filters + link to detail. Calendar: click day → filtered list or detail.
 
 ## Docker and Compose
 
-- `**[docker-compose.yml](docker-compose.yml)`** — services: `mongo`, `backend`, `frontend`, optional `mongo-express` *only for dev* (omit in prod)
+- `**[docker-compose.yml](docker-compose.yml)`** — services: `mongo`, `app`, `web`, optional `mongo-express` *only for dev* (omit in prod)
 - **Backend Dockerfile** — multi-stage: install deps, copy app, `uvicorn` entrypoint; env: `MONGODB_URI`, `JWT_SECRET`, `AUDIO_STORAGE_PATH`, `OPENAI_API_KEY` (optional), transcription/AI provider toggles
 - **Frontend Dockerfile** — multi-stage: `npm ci`, `vite build`, **nginx** serving `dist/` with SPA fallback
 - **Volumes:** named volume for Mongo data; named volume (or bind mount) for `**/data/audio`**
-- **Networking:** frontend calls backend via `VITE_API_URL` (build-time) pointing to same Compose network (`http://backend:8000`)
+- **Networking:** browser uses `VITE_API_URL`; containers use `http://app:8000` on the Compose network
 
 ## Configuration and secrets
 
@@ -164,7 +164,7 @@ Under `[frontend/](frontend/)`:
 
 ## Files to add (initial milestone)
 
-- `[docker-compose.yml](docker-compose.yml)`, `[backend/Dockerfile](backend/Dockerfile)`, `[frontend/Dockerfile](frontend/Dockerfile)`
+- `[docker-compose.yml](docker-compose.yml)`, `[app/Dockerfile](app/Dockerfile)`, `[web/Dockerfile](web/Dockerfile)`
 - Backend: `pyproject.toml` or `requirements.txt`, FastAPI app factory, package layout as above
 - Frontend: Vite template files, env example
 - Root `[.env.example](.env.example)`

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/auth-responses.json",
+  "title": "AuthTokenResponse",
+  "type": "object",
+  "required": ["access_token", "token_type", "user"],
+  "properties": {
+    "access_token": { "type": "string" },
+    "token_type": { "type": "string", "const": "bearer" },
+    "expires_in": { "type": "integer", "minimum": 1 },
+    "user": {
+      "type": "object",
+      "required": ["id", "email"],
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

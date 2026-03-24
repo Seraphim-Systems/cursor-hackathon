@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/insights.json",
+  "title": "JournalInsights",
+  "type": "object",
+  "properties": {
+    "key_points": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "goals": { "type": "array", "items": { "type": "string" } },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "people": { "type": "array", "items": { "type": "string" } },
+    "priorities": { "type": "array", "items": { "type": "string" } },
+    "themes": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

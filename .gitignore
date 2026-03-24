@@ -134,8 +134,11 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
-# Environments
+# Environments (use `.env.example` + docs/DEPLOYMENT.md for secrets in CI)
 .env
+.env.local
+.env.*.local
+!.env.example
 .envrc
 .venv
 env/

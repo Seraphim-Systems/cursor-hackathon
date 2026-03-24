@@ -1,0 +1,71 @@
+# Load variables from a local `.env` file if present (never commit `.env`).
+# For deployment, inject the same keys from your CI/CD secret store (see docs/DEPLOYMENT.md).
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+
+  stt:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    restart: unless-stopped
+    environment:
+      ASR_ENGINE: faster_whisper
+      ASR_MODEL: base
+      ASR_DEVICE: cpu
+    volumes:
+      - whisper_cache:/root/.cache
+    ports:
+      - "9000:9000"
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-journal}
+      JWT_SECRET: ${JWT_SECRET:-dev-secret-not-for-production}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+      AUDIO_STORAGE_PATH: ${AUDIO_STORAGE_PATH:-/data/audio}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:80,http://localhost}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-http_stt}
+      STT_BASE_URL: ${STT_BASE_URL:-http://stt:9000}
+      STT_TRANSCRIBE_PATH: ${STT_TRANSCRIBE_PATH:-/asr}
+      STT_FORM_FIELD: ${STT_FORM_FIELD:-audio_file}
+      STT_TIMEOUT_SECONDS: ${STT_TIMEOUT_SECONDS:-600}
+      AI_ANALYSIS_PROVIDER: ${AI_ANALYSIS_PROVIDER:-stub}
+      AI_OPENAI_BASE_URL: ${AI_OPENAI_BASE_URL:-https://api.openai.com/v1}
+      AI_OPENAI_MODEL: ${AI_OPENAI_MODEL:-gpt-4o-mini}
+      AI_HTTP_TIMEOUT_SECONDS: ${AI_HTTP_TIMEOUT_SECONDS:-120}
+    volumes:
+      - audio_uploads:/data/audio
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+      - stt
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+
+volumes:
+  mongo_data:
+  audio_uploads:
+  whisper_cache:

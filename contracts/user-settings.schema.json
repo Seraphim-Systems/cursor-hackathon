@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/user-settings.json",
+  "title": "UserSettings",
+  "type": "object",
+  "properties": {
+    "timezone": { "type": "string", "description": "IANA tz, e.g. Europe/Berlin" },
+    "week_starts_on": { "type": "string", "enum": ["monday", "sunday"] },
+    "default_audio_quality": { "type": "string", "enum": ["low", "medium", "high"] },
+    "theme": { "type": "string", "enum": ["light", "dark", "system"] },
+    "notifications_enabled": { "type": "boolean" }
+  },
+  "additionalProperties": true
+}
