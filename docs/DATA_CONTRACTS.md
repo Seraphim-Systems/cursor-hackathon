@@ -51,7 +51,7 @@ Global conventions:
 
 ### `POST /api/entries`
 
-Creates an entry; may include multipart `audio` and/or JSON fields per implementation.
+Creates an entry from JSON (`application/json`) or `multipart/form-data` with optional file field `audio` (and optional `metadata` JSON string for the same fields as the JSON body). When `audio` is present, the server stores it via `IAudioStorage`, runs the configured `ITranscriber`, and sets `audio_storage_key` and `transcript` on the new entry.
 
 **Core resource shape:** [`journal-entry.schema.json`](../contracts/journal-entry.schema.json).
 
@@ -67,7 +67,13 @@ Query params: `limit`, `offset`, optional `from`, `to` date filter.
 
 ### `PATCH /api/entries/{id}`
 
-**Request body:** partial entry; includes `insights` and `insights_field_locks` updates. Server must refuse to overwrite locked insight keys when processing `POST .../analyze` (not on PATCH—user may unlock).
+**Request body:** partial entry; includes `insights` and `insights_field_locks` updates. For partial `insights`, the server keeps locked subfields (see `insights_field_locks` below); clients may remove paths from `insights_field_locks` to edit those fields. `POST .../analyze` must still skip locked paths when merging AI output.
+
+### `POST /api/entries/{id}/upload-audio`
+
+**Request:** `multipart/form-data` with file field `audio`.
+
+**Response `200`:** full `JournalEntry` with `audio_storage_key` and `transcript` populated after running the configured `ITranscriber`. `source` becomes `audio` unless `cleaned_text` was already set, in which case `source` is `mixed`.
 
 ### `DELETE /api/entries/{id}`
 
@@ -80,7 +86,7 @@ Query params: `limit`, `offset`, optional `from`, `to` date filter.
 Embedded in `JournalEntry`:
 
 - `insights`: object matching [`insights.schema.json`](../contracts/insights.schema.json).
-- `insights_field_locks`: array of dot-path or top-level keys that AI re-run must not replace (e.g. `["summary", "insights.projects"]` — exact convention TBD in implementation; document in schema `description` if needed).
+- `insights_field_locks`: array of paths that AI re-run must not replace: `summary`, `sentiment_score`, `insights` (entire nested object), or `insights.<key>` for `key_points`, `projects`, `goals`, `blockers`, `people`, `priorities`, `themes`. On `PATCH`, partial `insights` bodies leave locked subfields unchanged; clients clear a path from this array to edit that field again.
 
 ### `POST /api/entries/{id}/analyze`
 
@@ -108,6 +114,10 @@ Partial update for user-driven rename/status.
 
 ### `GET /api/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD`
 
+Requires `Authorization: Bearer <JWT>` (see §Auth). Entries are grouped by **calendar date** in the user’s `settings.timezone` when set (IANA name); otherwise **UTC**.
+
+JSON Schema: [`calendar-response.schema.json`](../contracts/calendar-response.schema.json).
+
 **Response `200`:**
 
 ```json
@@ -122,7 +132,7 @@ Partial update for user-driven rename/status.
 }
 ```
 
-`entry_ids` may be omitted when `count` only is needed (implementation choice—pick one and keep stable).
+Every day in the requested inclusive range appears once (chronological order). `entry_ids` and `count` are both present; `count` matches `len(entry_ids)`.
 
 ---
 

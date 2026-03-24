@@ -37,7 +37,7 @@ This document splits delivery into **three parts**, each with **subtasks**, **ch
 | P2.6 | `ProjectDocument` + auto create/update from AI `projects`; `GET/PATCH /api/projects` | New name creates row; repeat mentions update `last_mentioned_at` |
 | P2.7 | `GET /api/calendar?from=&to=` — entries grouped by UTC date (or user tz from settings) | Response shape per [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md) §Calendar |
 
-**Data contracts for Part 2:** [`contracts/journal-entry.schema.json`](contracts/journal-entry.schema.json), [`contracts/insights.schema.json`](contracts/insights.schema.json), §Entries, §Insights, §Calendar, §Projects in [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md).
+**Data contracts for Part 2:** [`contracts/journal-entry.schema.json`](contracts/journal-entry.schema.json), [`contracts/insights.schema.json`](contracts/insights.schema.json), [`contracts/calendar-response.schema.json`](contracts/calendar-response.schema.json), §Entries, §Insights, §Calendar, §Projects in [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md).
 
 ---
 
