@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     audio_storage_path: str = "/data/audio"
     cors_origins: str = "http://localhost:5173,http://localhost:80,http://localhost"
 
+    # Admin seeding
+    admin_email: str | None = None
+    admin_password: str | None = None
+
     # Optional cloud key (also used when AI base URL points to OpenAI-compatible hosts)
     openai_api_key: str | None = None
 

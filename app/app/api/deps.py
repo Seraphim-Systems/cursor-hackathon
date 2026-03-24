@@ -32,7 +32,17 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserDocument:
     return user
 
 
+async def get_current_admin(user: UserDocument = Depends(get_current_user)) -> UserDocument:
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+    return user
+
+
 UserDep = Annotated[UserDocument, Depends(get_current_user)]
+AdminDep = Annotated[UserDocument, Depends(get_current_admin)]
 
 
 def get_audio_storage() -> LocalAudioStorage:

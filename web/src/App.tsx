@@ -8,6 +8,7 @@ import { HistoryPage } from "./pages/HistoryPage";
 import { LoginPage } from "./pages/LoginPage";
 import { RecordPage } from "./pages/RecordPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import AdminPage from "./pages/AdminPage";
 
 const apiBase = import.meta.env.VITE_API_URL ?? "";
 
@@ -25,6 +26,7 @@ export default function App() {
           <Link to="/history">History</Link>
           <Link to="/calendar">Calendar</Link>
           <Link to="/settings">Settings</Link>
+          {user?.is_admin && <Link to="/admin" style={{ color: "#4338ca", fontWeight: 600 }}>Admin</Link>}
           {user ? (
             <button
               type="button"
@@ -43,7 +45,7 @@ export default function App() {
                 textDecoration: "underline",
               }}
             >
-              Log out ({user.email})
+              Log out {user.email ? `(${user.email})` : ""}
             </button>
           ) : (
             <Link to="/login" style={{ marginLeft: "auto" }}>
@@ -87,6 +89,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPage />
             </ProtectedRoute>
           }
         />

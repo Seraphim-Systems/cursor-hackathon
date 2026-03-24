@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { fetchMe, loginRequest } from "../api/auth";
 import { clearStoredToken, getStoredToken, setStoredToken } from "../api/token";
 
-type User = { id: string; email: string };
+type User = { id: string; email: string; is_admin?: boolean };
 
 type AuthContextValue = {
   token: string | null;
@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setReady(false);
     fetchMe()
-      .then((res) => setUser(res.user))
+      .then((res) => setUser(res.user as User))
       .catch(() => {
         clearStoredToken();
         setToken(null);
@@ -40,8 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const data = await loginRequest(email, password);
     setStoredToken(data.access_token);
-    setReady(false);
     setToken(data.access_token);
+    setUser(data.user as User);
   }, []);
 
   const logout = useCallback(() => {

@@ -15,6 +15,7 @@ class UserDocument(Document):
 
     email: Annotated[EmailStr, Indexed(unique=True)]
     hashed_password: str
+    is_admin: bool = False
     settings: UserSettings = Field(default_factory=UserSettings)
 
     class Settings:
@@ -41,12 +42,14 @@ class JournalEntryDocument(Document):
 
     user_id: str
     title: str = ""
+    source: Literal["text", "audio", "mixed"] = "text"
     content: str = ""
+    audio_storage_key: str | None = None
     transcript: str | None = None
     cleaned_text: str | None = None
     summary: str | None = None
     sentiment_score: float | None = None
-    insights: InsightsEmbedded | None = None
+    insights: InsightsEmbedded = Field(default_factory=InsightsEmbedded)
     insights_field_locks: list[str] = Field(default_factory=list)
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
