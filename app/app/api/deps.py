@@ -2,23 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.application.facades.auth_facade import AuthFacade
-from app.application.facades.journal_facade import JournalFacade
 from app.config import settings
-from app.infrastructure.adapters import build_analyzer, build_transcriber
-from app.infrastructure.adapters.local_audio_storage import LocalAudioStorage
+from app.domain.protocols import IAIAnalyzer, IAudioStorage, ITranscriber
+from app.infrastructure.adapters import build_analyzer, build_audio_storage, build_transcriber
 from app.infrastructure.persistence.documents import UserDocument
-from app.infrastructure.persistence.repositories import (
-    JournalEntryRepository,
-    ProjectRepository,
-    UserRepository,
-)
+from app.infrastructure.persistence.repositories import UserRepository
 from app.api.security import decode_subject
 
 bearer_scheme = HTTPBearer(auto_error=True)
@@ -40,19 +34,20 @@ async def get_current_user(
 UserDep = Annotated[UserDocument, Depends(get_current_user)]
 
 
-def get_journal_facade() -> JournalFacade:
-    return JournalFacade(
-        entries=JournalEntryRepository(),
-        projects=ProjectRepository(),
-        storage=LocalAudioStorage(Path(settings.audio_storage_path)),
-        transcriber=build_transcriber(settings),
-        analyzer=build_analyzer(settings),
-    )
+def get_analyzer() -> IAIAnalyzer:
+    return build_analyzer(settings)
+
+
+def get_audio_storage() -> IAudioStorage:
+    return build_audio_storage(settings)
+
+
+def get_transcriber() -> ITranscriber:
+    return build_transcriber(settings)
 
 
 def get_auth_facade() -> AuthFacade:
     return AuthFacade(users=UserRepository())
 
 
-JournalFacadeDep = Annotated[JournalFacade, Depends(get_journal_facade)]
 AuthFacadeDep = Annotated[AuthFacade, Depends(get_auth_facade)]
