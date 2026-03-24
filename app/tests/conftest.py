@@ -1,17 +1,18 @@
-"""Pytest configuration and shared fixtures."""
+"""Bootstrap env before `app.config.settings` is imported by any test module."""
 
 from __future__ import annotations
+from fastapi import FastAPI
+from app.api.routers.entries import router as entries_router
 
 import os
+import pytest
+
+os.environ.setdefault("JWT_SECRET", "test-secret-pytest")
+os.environ.setdefault("MONGODB_DB_NAME", "journal_pytest")
+os.environ.setdefault("TRANSCRIPTION_PROVIDER", "stub")
+os.environ.setdefault("AI_ANALYSIS_PROVIDER", "stub")
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-
-import pytest
-from fastapi import FastAPI
-
-os.environ.setdefault("MONGODB_DB_NAME", "journal_pytest")
-
-from app.api.routers.entries import router as entries_router
 
 
 @asynccontextmanager
