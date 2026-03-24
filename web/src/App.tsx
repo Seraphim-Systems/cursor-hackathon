@@ -1,3 +1,8 @@
+import { Link, Route, Routes } from "react-router-dom";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { useAuth } from "./contexts/AuthContext";
+import { DashboardPage } from "./pages/DashboardPage";
+import { LoginPage } from "./pages/LoginPage";
 import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -9,9 +14,10 @@ import { LoginPage } from "./pages/Login";
 import { RecordPage } from "./pages/RecordPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
-const apiBase = import.meta.env.VITE_API_URL || "";
+const apiBase = import.meta.env.VITE_API_URL ?? "";
 
 export function App() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { token, logout } = useAuth();
 
@@ -56,6 +62,10 @@ export function App() {
         ) : (
           <p style={{ fontSize: "0.85rem", color: "#555", marginTop: "0.5rem" }}>
             API: same origin <code>/api</code> (Vite dev proxy)
+          </p>
+        ) : (
+          <p style={{ fontSize: "0.85rem", color: "#555", marginTop: "0.5rem" }}>
+            API: same origin (use Vite dev proxy <code>/api</code> → app)
           </p>
         )}
       </header>

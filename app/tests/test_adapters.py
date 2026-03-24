@@ -3,6 +3,14 @@ import pytest
 import respx
 
 from app.domain.protocols import TranscriptionResult
+from app.infrastructure.adapters.http_stt_transcriber import HttpSttTranscriber as StandaloneHttpStt
+from app.infrastructure.adapters.registry import (
+    HttpSttTranscriber,
+    StubAnalyzer,
+    StubTranscriber,
+    build_analyzer,
+    build_transcriber,
+)
 from app.infrastructure.adapters.http_stt_transcriber import HttpSttTranscriber
 from app.infrastructure.adapters.openai_compat_transcriber import OpenAiCompatTranscriber
 from app.infrastructure.adapters.registry import build_analyzer, build_transcriber
@@ -76,7 +84,7 @@ async def test_http_stt_plain_text_body() -> None:
     respx.post("http://stt-local:9000/asr").mock(
         return_value=httpx.Response(200, text="  transcribed line  \n"),
     )
-    t = HttpSttTranscriber(base_url="http://stt-local:9000", path="/asr")
+    t = StandaloneHttpStt(base_url="http://stt-local:9000", path="/asr")
     r = await t.transcribe(audio_bytes=b"\x00\x01", mime_type="audio/wav")
     assert isinstance(r, TranscriptionResult)
     assert r.text == "transcribed line"
@@ -92,7 +100,7 @@ async def test_http_stt_json_body() -> None:
             headers={"content-type": "application/json"},
         ),
     )
-    t = HttpSttTranscriber(base_url="http://stt-local:9000")
+    t = StandaloneHttpStt(base_url="http://stt-local:9000")
     r = await t.transcribe(audio_bytes=b"x", mime_type=None)
     assert r.text == "from json"
 

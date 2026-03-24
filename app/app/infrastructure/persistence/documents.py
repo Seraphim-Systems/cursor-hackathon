@@ -1,4 +1,23 @@
-"""Beanie document models — aligned with contracts and the Part 2 journal pipeline."""
+"""Beanie documents."""
+
+from typing import Annotated
+
+from beanie import Document, Indexed
+from pydantic import EmailStr, Field
+
+from app.schemas.user_settings import UserSettings
+
+
+class UserDocument(Document):
+    """User account; `settings` matches [`user-settings.schema.json`](../../../../contracts/user-settings.schema.json)."""
+
+    email: Annotated[EmailStr, Indexed(unique=True)]
+    hashed_password: str
+    settings: UserSettings = Field(default_factory=UserSettings)
+
+    class Settings:
+        name = "users"
+"""Beanie documents — align with contracts/journal-entry and user-settings schemas."""
 
 from __future__ import annotations
 
@@ -72,3 +91,39 @@ class JournalEntryDocument(Document):
         indexes = [
             IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)]),
         ]
+
+
+class ProjectDocument(Document):
+    user_id: str
+    title: str
+    normalized_name: str
+    description: str | None = None
+    first_seen_at: datetime
+    last_mentioned_at: datetime
+    related_entry_ids: list[str] = Field(default_factory=list)
+    status: str | None = None
+
+    class Settings:
+        name = "projects"
+        indexes = [
+            IndexModel([("user_id", ASCENDING), ("normalized_name", ASCENDING)], unique=True),
+        ]
+"""Beanie documents."""
+
+from typing import Annotated
+
+from beanie import Document, Indexed
+from pydantic import EmailStr, Field
+
+from app.schemas.user_settings import UserSettings
+
+
+class UserDocument(Document):
+    """User account; `settings` matches [`user-settings.schema.json`](../../../../contracts/user-settings.schema.json)."""
+
+    email: Annotated[EmailStr, Indexed(unique=True)]
+    hashed_password: str
+    settings: UserSettings = Field(default_factory=UserSettings)
+
+    class Settings:
+        name = "users"

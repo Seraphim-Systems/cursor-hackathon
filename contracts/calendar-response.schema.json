@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cursor-hackathon.local/schemas/journal/calendar-response.json",
   "title": "CalendarResponse",
+  "description": "Response for GET /api/calendar",
   "type": "object",
   "required": ["days"],
   "properties": {
