@@ -65,98 +65,104 @@ export function SettingsPage() {
   }
 
   if (!loaded) {
-    return <p>Loading settings…</p>;
+    return (
+      <div className="page-shell">
+        <p className="muted">Loading settings…</p>
+      </div>
+    );
   }
 
   if (loadError) {
     return (
-      <div>
-        <p role="alert" style={{ color: "#b00020" }}>
+      <div className="page-shell">
+        <p role="alert" className="text-error">
           {loadError}
         </p>
-        <p>
-          <Link to="/login">Log in again</Link>
+        <p style={{ marginTop: "0.75rem" }}>
+          <Link to="/login" className="btn-gold">
+            Log in again
+          </Link>
         </p>
       </div>
     );
   }
 
   return (
-    <div>
-      <h2 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "1rem" }}>Settings</h2>
-      <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.85rem", maxWidth: 420 }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-          <span style={{ fontSize: "0.85rem" }}>Timezone (IANA)</span>
-          <input
-            type="text"
-            value={values.timezone}
-            onChange={(ev) => setValues((v) => ({ ...v, timezone: ev.target.value }))}
-            placeholder="e.g. Europe/Berlin"
-            autoComplete="off"
-            style={{ padding: "0.5rem 0.6rem", fontSize: "1rem" }}
-          />
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-          <span style={{ fontSize: "0.85rem" }}>Week starts on</span>
-          <select
-            value={values.week_starts_on}
-            onChange={(ev) =>
-              setValues((v) => ({ ...v, week_starts_on: ev.target.value as WeekStartsOn }))
-            }
-            style={{ padding: "0.5rem 0.6rem", fontSize: "1rem" }}
-          >
-            <option value="monday">Monday</option>
-            <option value="sunday">Sunday</option>
-          </select>
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-          <span style={{ fontSize: "0.85rem" }}>Default audio quality</span>
-          <select
-            value={values.default_audio_quality}
-            onChange={(ev) =>
-              setValues((v) => ({ ...v, default_audio_quality: ev.target.value as AudioQuality }))
-            }
-            style={{ padding: "0.5rem 0.6rem", fontSize: "1rem" }}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-          <span style={{ fontSize: "0.85rem" }}>Theme</span>
-          <select
-            value={values.theme}
-            onChange={(ev) => setValues((v) => ({ ...v, theme: ev.target.value as Theme }))}
-            style={{ padding: "0.5rem 0.6rem", fontSize: "1rem" }}
-          >
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-            <option value="system">System</option>
-          </select>
-        </label>
-        <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
-          <input
-            type="checkbox"
-            checked={values.notifications_enabled}
-            onChange={(ev) =>
-              setValues((v) => ({ ...v, notifications_enabled: ev.target.checked }))
-            }
-          />
-          <span>Notifications enabled</span>
-        </label>
-        {saveError ? (
-          <p role="alert" style={{ color: "#b00020", fontSize: "0.9rem", margin: 0 }}>
-            {saveError}
-          </p>
-        ) : null}
-        {saveOk ? (
-          <p style={{ color: "#1b5e20", fontSize: "0.9rem", margin: 0 }}>Saved.</p>
-        ) : null}
-        <button type="submit" disabled={pending} style={{ padding: "0.55rem 1rem", cursor: pending ? "wait" : "pointer" }}>
-          {pending ? "Saving…" : "Save"}
-        </button>
-      </form>
+    <div className="page-shell page-shell--narrow">
+      <section className="ui-card">
+        <h2 className="page-title">Settings</h2>
+        <form onSubmit={onSubmit} className="stack-lg" style={{ marginTop: "0.5rem" }}>
+          <label className="form-field">
+            <span className="muted">Timezone (IANA)</span>
+            <input
+              type="text"
+              value={values.timezone}
+              onChange={(ev) => setValues((v) => ({ ...v, timezone: ev.target.value }))}
+              placeholder="e.g. Europe/Berlin"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span className="muted">Week starts on</span>
+            <select
+              value={values.week_starts_on}
+              onChange={(ev) =>
+                setValues((v) => ({ ...v, week_starts_on: ev.target.value as WeekStartsOn }))
+              }
+            >
+              <option value="monday">Monday</option>
+              <option value="sunday">Sunday</option>
+            </select>
+          </label>
+          <label className="form-field">
+            <span className="muted">Default audio quality</span>
+            <select
+              value={values.default_audio_quality}
+              onChange={(ev) =>
+                setValues((v) => ({ ...v, default_audio_quality: ev.target.value as AudioQuality }))
+              }
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </label>
+          <label className="form-field">
+            <span className="muted">Theme</span>
+            <select
+              value={values.theme}
+              onChange={(ev) => setValues((v) => ({ ...v, theme: ev.target.value as Theme }))}
+            >
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="system">System</option>
+            </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={values.notifications_enabled}
+              onChange={(ev) =>
+                setValues((v) => ({ ...v, notifications_enabled: ev.target.checked }))
+              }
+            />
+            <span>Notifications enabled</span>
+          </label>
+          {saveError ? (
+            <p role="alert" className="text-error" style={{ fontSize: "0.9rem", margin: 0 }}>
+              {saveError}
+            </p>
+          ) : null}
+          {saveOk ? (
+            <p className="text-success" style={{ fontSize: "0.9rem", margin: 0 }} role="status">
+              Saved.
+            </p>
+          ) : null}
+          <button type="submit" className="btn-gold" disabled={pending}>
+            {pending ? "Saving…" : "Save"}
+          </button>
+        </form>
+      </section>
     </div>
   );
 }

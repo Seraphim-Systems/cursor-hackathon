@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, createEntryWithAudioProgress } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { DuckMicButton } from "../components/DuckRecordButton";
 
 function pickRecorderMime(): string | undefined {
   const candidates = [
@@ -135,86 +136,63 @@ export function RecordPage() {
   };
 
   return (
-    <div style={{ maxWidth: 480 }}>
-      <h2 style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Record</h2>
-      <p style={{ fontSize: "0.9rem", color: "#444", marginBottom: "1rem" }}>
-        Capture audio with the microphone, then upload. The API runs transcription and analysis (stub or
-        configured adapters).
-      </p>
+    <div className="page-shell stack-lg">
+      <div className="ui-card">
+        <h2 className="page-title" style={{ marginBottom: "0.5rem" }}>
+          Your thought, out loud
+        </h2>
+        <p className="muted" style={{ margin: 0 }}>
+          Think it through with the duck listening — we turn what you say into text you can read and keep. When
+          you’re done, we save it for you.
+        </p>
+      </div>
 
       {!supported ? (
-        <p role="alert" style={{ color: "#b00020" }}>
+        <p role="alert" className="text-error">
           MediaRecorder is not available. Use a recent desktop or mobile browser.
         </p>
       ) : null}
 
       {error ? (
-        <p role="alert" style={{ color: "#b00020", marginBottom: "0.75rem" }}>
+        <p role="alert" className="text-error" style={{ margin: 0 }}>
           {error}
         </p>
       ) : null}
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-        {phase !== "recording" && phase !== "uploading" ? (
-          <button
-            type="button"
-            onClick={startRecording}
-            disabled={!supported || !token}
-            style={buttonStyle}
-          >
-            Start recording
-          </button>
-        ) : null}
-        {phase === "recording" ? (
-          <button type="button" onClick={stopAndUpload} style={{ ...buttonStyle, background: "#8b0000" }}>
-            Stop & upload
-          </button>
-        ) : null}
-        {phase === "uploading" ? (
-          <span style={{ fontSize: "0.95rem", color: "#333" }}>Uploading…</span>
-        ) : null}
+      <div style={{ display: "flex", justifyContent: "center", marginTop: "0.5rem" }}>
+        <DuckMicButton
+          recording={phase === "recording"}
+          uploading={phase === "uploading"}
+          disabled={!supported || !token}
+          onPress={() => {
+            if (phase === "recording") void stopAndUpload();
+            else if (phase === "idle") void startRecording();
+          }}
+        />
       </div>
 
       {phase === "uploading" && uploadPct !== null ? (
-        <div style={{ marginTop: "1rem" }}>
+        <div>
           <div
-            style={{
-              height: 8,
-              borderRadius: 4,
-              background: "#e8e8e8",
-              overflow: "hidden",
-            }}
+            className="progress-track"
             role="progressbar"
             aria-valuenow={uploadPct}
             aria-valuemin={0}
             aria-valuemax={100}
           >
-            <div
-              style={{
-                height: "100%",
-                width: `${uploadPct}%`,
-                background: "#1a6bb3",
-                transition: "width 0.1s ease-out",
-              }}
-            />
+            <div className="progress-fill" style={{ width: `${uploadPct}%` }} />
           </div>
-          <p style={{ fontSize: "0.85rem", color: "#555", marginTop: "0.35rem" }}>{uploadPct}%</p>
+          <p className="muted" style={{ marginTop: "0.4rem", marginBottom: 0 }}>
+            {uploadPct}%
+          </p>
         </div>
       ) : null}
 
-      <p style={{ marginTop: "1.25rem", fontSize: "0.85rem", color: "#555" }}>
-        <Link to="/">← Home</Link>
+      <p style={{ margin: 0 }}>
+        <Link to="/" className="link-back">
+          ← Dashboard
+        </Link>
       </p>
     </div>
   );
 }
-
-const buttonStyle: CSSProperties = {
-  padding: "0.55rem 1rem",
-  borderRadius: 6,
-  border: "none",
-  background: "#1a1a1a",
-  color: "#fff",
-  cursor: "pointer",
-  fontWeight: 500,
-};

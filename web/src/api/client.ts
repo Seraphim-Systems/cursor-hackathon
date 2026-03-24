@@ -79,6 +79,14 @@ export async function login(email: string, password: string): Promise<TokenRespo
   });
 }
 
+/** Password must be at least 8 characters (server rule). */
+export async function register(email: string, password: string): Promise<TokenResponse> {
+  return apiFetch<TokenResponse>("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
 export async function listEntries(limit = 50, offset = 0): Promise<EntryListResponse> {
   const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   return apiFetch<EntryListResponse>(`/api/entries?${q.toString()}`);

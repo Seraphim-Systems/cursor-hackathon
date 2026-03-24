@@ -51,49 +51,60 @@ export function HistoryPage() {
   }, []);
 
   if (loading) {
-    return <p>Loading entries…</p>;
+    return (
+      <div className="page-shell">
+        <p className="muted">Loading entries…</p>
+      </div>
+    );
   }
 
   if (error) {
     return (
-      <p role="alert" style={{ color: "#b00020" }}>
-        {error}
-      </p>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <div>
-        <p>No journal entries yet.</p>
-        <p style={{ fontSize: "0.9rem", color: "#555" }}>
-          Create one from the record flow (Part 3.2) or via the API.
+      <div className="page-shell">
+        <p role="alert" className="text-error">
+          {error}
         </p>
       </div>
     );
   }
 
+  if (items.length === 0) {
+    return (
+      <div className="page-shell">
+        <h2 className="page-title">History</h2>
+        <div className="empty-state">
+          <p style={{ margin: 0 }}>No journal entries yet.</p>
+          <div className="empty-state__cta">
+            <Link to="/record" className="btn-gold">
+              Capture a thought
+            </Link>
+          </div>
+          <p className="muted" style={{ marginTop: "0.75rem", marginBottom: 0, textAlign: "center" }}>
+            Or add one via the API.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>History</h2>
+    <div className="page-shell">
+      <h2 className="page-title">History</h2>
       {total != null ? (
-        <p style={{ fontSize: "0.85rem", color: "#555", marginTop: 0 }}>{total} total</p>
+        <p className="muted" style={{ marginTop: "-0.5rem" }}>
+          {total} total
+        </p>
       ) : null}
-      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "0.75rem" }}>
+      <ul className="entry-list" style={{ marginTop: "1rem" }}>
         {items.map((e) => (
-          <li
-            key={e.id}
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: 6,
-              padding: "0.75rem 1rem",
-            }}
-          >
-            <div style={{ fontSize: "0.8rem", color: "#666" }}>{formatWhen(e.created_at)}</div>
-            <Link to={`/entries/${e.id}`} style={{ fontWeight: 600, textDecoration: "none" }}>
+          <li key={e.id} className="ui-card" style={{ padding: "1rem 1.15rem" }}>
+            <div className="muted" style={{ fontSize: "0.8rem", marginBottom: "0.35rem" }}>
+              {formatWhen(e.created_at)}
+            </div>
+            <Link to={`/entries/${e.id}`} className="history-preview-link">
               {preview(e)}
             </Link>
-            <div style={{ fontSize: "0.8rem", color: "#888", marginTop: "0.25rem" }}>
+            <div className="muted" style={{ fontSize: "0.8rem", marginTop: "0.45rem", opacity: 0.85 }}>
               {e.source} · {e.id}
             </div>
           </li>
