@@ -68,46 +68,39 @@ export function CalendarPage() {
   });
 
   return (
-    <div>
-      <h2 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>Calendar</h2>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
-        <button type="button" onClick={prevMonth} style={{ padding: "0.35rem 0.65rem" }}>
+    <div className="page-shell">
+      <h2 className="page-title">Calendar</h2>
+      <div className="calendar-toolbar">
+        <button type="button" className="btn-calendar-nav btn-ghost" onClick={prevMonth} aria-label="Previous month">
           ←
         </button>
-        <span style={{ fontWeight: 600, minWidth: 180, textAlign: "center" }}>{label}</span>
-        <button type="button" onClick={nextMonth} style={{ padding: "0.35rem 0.65rem" }}>
+        <span className="calendar-toolbar__label">{label}</span>
+        <button type="button" className="btn-calendar-nav btn-ghost" onClick={nextMonth} aria-label="Next month">
           →
         </button>
       </div>
-      <p style={{ fontSize: "0.85rem", color: "#555", marginTop: 0 }}>
+      <p className="muted" style={{ marginTop: 0 }}>
         Range sent to API: <code>{from}</code> … <code>{to}</code> (UTC day boundaries for listing)
       </p>
 
-      {loading ? <p>Loading…</p> : null}
+      {loading ? <p className="muted">Loading…</p> : null}
       {error ? (
-        <p role="alert" style={{ color: "#b00020" }}>
+        <p role="alert" className="text-error">
           {error}
         </p>
       ) : null}
 
       {!loading && !error && days.length === 0 ? (
-        <p>No entries with activity in this month.</p>
+        <p className="muted">No entries with activity in this month.</p>
       ) : null}
 
       {!loading && !error && days.length > 0 ? (
         <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "1rem" }}>
           {days.map((d) => (
-            <li
-              key={d.date}
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: 6,
-                padding: "0.75rem 1rem",
-              }}
-            >
-              <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>
+            <li key={d.date} className="ui-card">
+              <div style={{ fontWeight: 650, marginBottom: "0.5rem" }}>
                 {d.date}{" "}
-                <span style={{ fontWeight: 400, color: "#666", fontSize: "0.9rem" }}>
+                <span className="muted" style={{ fontWeight: 500, fontSize: "0.9rem" }}>
                   ({d.count} {d.count === 1 ? "entry" : "entries"})
                 </span>
               </div>

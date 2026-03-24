@@ -237,42 +237,39 @@ export function EntryDetailPage() {
     setProjects((rows) => rows.filter((_, j) => j !== i));
   }
 
-  const textareaStyle = {
-    width: "100%",
-    minHeight: 80,
-    padding: "0.5rem",
-    fontFamily: "inherit",
-    fontSize: "0.9rem",
-    boxSizing: "border-box" as const,
-  };
-
   if (!id) {
-    return <p>Missing entry id.</p>;
+    return <p className="muted">Missing entry id.</p>;
   }
 
   if (loading) {
-    return <p>Loading entry…</p>;
+    return <p className="muted">Loading entry…</p>;
   }
 
   if (error) {
     return (
-      <div>
-        <p role="alert" style={{ color: "#b00020" }}>
+      <div className="page-shell stack-lg">
+        <p role="alert" className="text-error">
           {error}
         </p>
-        <Link to="/history">Back to history</Link>
+        <p style={{ margin: 0 }}>
+          <Link to="/history" className="link-back">
+            ← Back to history
+          </Link>
+        </p>
       </div>
     );
   }
 
   return (
-    <div>
-      <p style={{ marginBottom: "1rem" }}>
-        <Link to="/history">← History</Link>
+    <div className="page-shell stack-lg">
+      <p style={{ margin: 0 }}>
+        <Link to="/history" className="link-back">
+          ← History
+        </Link>
       </p>
 
       {meta ? (
-        <div style={{ fontSize: "0.85rem", color: "#555", marginBottom: "1rem" }}>
+        <div className="ui-card meta-panel">
           <div>
             <strong>Source:</strong> {meta.source}
           </div>
@@ -287,14 +284,14 @@ export function EntryDetailPage() {
 
       <form onSubmit={onSave} style={{ display: "grid", gap: "1.25rem" }}>
         <section>
-          <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>Summary & sentiment</h3>
+          <h3>Summary & sentiment</h3>
           <label style={{ display: "grid", gap: "0.35rem" }}>
             <span>Summary</span>
             <textarea
+              className="field-textarea"
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               rows={3}
-              style={textareaStyle}
             />
           </label>
           <label style={{ display: "grid", gap: "0.35rem", marginTop: "0.75rem" }}>
@@ -302,29 +299,37 @@ export function EntryDetailPage() {
             <input
               type="text"
               inputMode="decimal"
+              className="field-narrow"
               value={sentiment}
               onChange={(e) => setSentiment(e.target.value)}
               placeholder="e.g. 0.2"
-              style={{ padding: "0.5rem", maxWidth: 200 }}
             />
           </label>
         </section>
 
         <section>
-          <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>Text</h3>
+          <h3>Text</h3>
           <label style={{ display: "grid", gap: "0.35rem" }}>
             <span>Cleaned text</span>
-            <textarea value={cleanedText} onChange={(e) => setCleanedText(e.target.value)} style={textareaStyle} />
+            <textarea
+              className="field-textarea"
+              value={cleanedText}
+              onChange={(e) => setCleanedText(e.target.value)}
+            />
           </label>
           <label style={{ display: "grid", gap: "0.35rem", marginTop: "0.75rem" }}>
             <span>Transcript</span>
-            <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} style={textareaStyle} />
+            <textarea
+              className="field-textarea"
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+            />
           </label>
         </section>
 
         <section>
-          <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>Insights</h3>
-          <p style={{ fontSize: "0.85rem", color: "#555", marginTop: 0 }}>
+          <h3>Insights</h3>
+          <p className="muted" style={{ fontSize: "0.85rem", marginTop: 0 }}>
             List fields: one item per line (matches <code>insights.schema.json</code> string arrays).
           </p>
 
@@ -340,38 +345,35 @@ export function EntryDetailPage() {
           ).map(([label, val, setVal]) => (
             <label key={label} style={{ display: "grid", gap: "0.35rem", marginBottom: "0.75rem" }}>
               <span>{label}</span>
-              <textarea value={val} onChange={(e) => setVal(e.target.value)} style={textareaStyle} />
+              <textarea className="field-textarea" value={val} onChange={(e) => setVal(e.target.value)} />
             </label>
           ))}
 
           <div style={{ marginTop: "0.5rem" }}>
-            <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>Projects (name + notes)</div>
-            <p style={{ fontSize: "0.85rem", color: "#555", marginTop: 0 }}>
+            <div style={{ fontWeight: 650, marginBottom: "0.5rem" }}>Projects (name + notes)</div>
+            <p className="muted" style={{ fontSize: "0.85rem", marginTop: 0 }}>
               Names must be at least 2 characters to persist (server rule).
             </p>
             {projects.map((p, i) => (
               <div
                 key={i}
+                className="ui-card"
                 style={{
                   display: "grid",
                   gap: "0.35rem",
                   marginBottom: "0.65rem",
-                  padding: "0.5rem",
-                  border: "1px solid #eee",
-                  borderRadius: 4,
+                  padding: "0.75rem 0.9rem",
                 }}
               >
                 <input
                   placeholder="Name"
                   value={p.name}
                   onChange={(e) => updateProject(i, "name", e.target.value)}
-                  style={{ padding: "0.45rem" }}
                 />
                 <input
                   placeholder="Notes"
                   value={p.notes}
                   onChange={(e) => updateProject(i, "notes", e.target.value)}
-                  style={{ padding: "0.45rem" }}
                 />
                 <button type="button" onClick={() => removeProjectRow(i)} style={{ justifySelf: "start" }}>
                   Remove row
@@ -385,8 +387,8 @@ export function EntryDetailPage() {
         </section>
 
         <section>
-          <h3 style={{ fontSize: "1rem", marginBottom: "0.5rem" }}>AI re-analyze locks</h3>
-          <p style={{ fontSize: "0.85rem", color: "#555", marginTop: 0 }}>
+          <h3>AI re-analyze locks</h3>
+          <p className="muted" style={{ fontSize: "0.85rem", marginTop: 0 }}>
             Checked paths are preserved when you run <strong>Re-analyze</strong> with{" "}
             <code>preserve_locked_fields: true</code> (see <code>docs/DATA_CONTRACTS.md</code> §Insights).
           </p>
@@ -411,31 +413,31 @@ export function EntryDetailPage() {
         </section>
 
         {saveError ? (
-          <p role="alert" style={{ color: "#b00020", margin: 0 }}>
+          <p role="alert" className="text-error" style={{ margin: 0 }}>
             {saveError}
           </p>
         ) : null}
         {saveOk ? (
-          <p style={{ color: "#0d6d0d", margin: 0 }} role="status">
+          <p className="text-success" style={{ margin: 0 }} role="status">
             Saved.
           </p>
         ) : null}
 
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
-          <button type="submit" disabled={saving} style={{ padding: "0.5rem 1rem" }}>
+        <div className="form-actions">
+          <button type="submit" className="btn-gold" disabled={saving}>
             {saving ? "Saving…" : "Save changes"}
           </button>
           <button
             type="button"
+            className="btn-ghost"
             onClick={() => void onReanalyze()}
             disabled={analyzing}
-            style={{ padding: "0.5rem 1rem" }}
           >
             {analyzing ? "Re-analyzing…" : "Re-analyze"}
           </button>
         </div>
         {analyzeError ? (
-          <p role="alert" style={{ color: "#b00020", margin: 0 }}>
+          <p role="alert" className="text-error" style={{ margin: 0 }}>
             {analyzeError}
           </p>
         ) : null}

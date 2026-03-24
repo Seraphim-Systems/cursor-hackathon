@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listEntries } from "../api/client";
 import type { JournalEntry } from "../api/types";
+import { DuckRecordButton } from "../components/DuckRecordButton";
 import { useAuth } from "../auth/AuthContext";
 
 function previewText(entry: JournalEntry): string {
@@ -22,20 +23,6 @@ function formatWhen(iso: string): string {
     return iso;
   }
 }
-
-const styles = {
-  wrap: { marginTop: "1rem" } as const,
-  list: { listStyle: "none", padding: 0, margin: 0 } as const,
-  item: {
-    border: "1px solid #e5e5e5",
-    borderRadius: 8,
-    padding: "0.75rem 1rem",
-    marginBottom: "0.5rem",
-  } as const,
-  meta: { fontSize: "0.8rem", color: "#666", marginTop: "0.35rem" } as const,
-  empty: { padding: "2rem 1rem", textAlign: "center" as const, color: "#555" },
-  err: { color: "#b42318", marginTop: "0.5rem" },
-};
 
 export function Dashboard() {
   const { token } = useAuth();
@@ -67,64 +54,85 @@ export function Dashboard() {
     };
   }, [token]);
 
-  if (!token) {
-    return (
-      <section style={styles.empty} aria-live="polite">
-        <p style={{ margin: 0 }}>Sign in to see your recent journal entries.</p>
-        <p style={{ marginTop: "1rem" }}>
-          <Link to="/login">Sign in</Link>
-        </p>
-      </section>
-    );
-  }
-
-  if (loading && items === null) {
-    return (
-      <section style={styles.wrap} aria-busy="true">
-        <p>Loading entries…</p>
-      </section>
-    );
-  }
-
-  if (error) {
-    return (
-      <section style={styles.wrap}>
-        <p>Could not load entries.</p>
-        <p style={styles.err}>{error}</p>
-        <p style={{ marginTop: "0.75rem" }}>
-          <Link to="/login">Sign in again</Link>
-        </p>
-      </section>
-    );
-  }
-
-  const list = items ?? [];
-  if (list.length === 0) {
-    return (
-      <section style={styles.empty} aria-live="polite">
-        <p style={{ margin: 0 }}>No journal entries yet.</p>
-        <p style={{ marginTop: "0.75rem" }}>
-          <Link to="/record">Start with a recording</Link> (full flow in P3.2), or add entries via the API.
-        </p>
-      </section>
-    );
-  }
-
   return (
-    <section style={styles.wrap}>
-      <h2 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem" }}>Recent entries</h2>
-      <ul style={styles.list}>
-        {list.map((entry) => (
-          <li key={entry.id} style={styles.item}>
-            <Link to={`/entries/${entry.id}`} style={{ fontWeight: 500, color: "inherit", textDecoration: "none" }}>
-              {previewText(entry)}
+    <>
+      <section className="dashboard-hero" aria-labelledby="dashboard-hero-title">
+        <h2 id="dashboard-hero-title" className="dashboard-hero__title">
+          Talk to the duck
+        </h2>
+        {token ? (
+          <p className="dashboard-hero__subtitle">
+            The duck is how you speak your thoughts and save them. Tap when something’s on your mind — no
+            typing required.
+          </p>
+        ) : (
+          <p className="dashboard-hero__subtitle">The duck helps you capture what you’re thinking.</p>
+        )}
+        <div className="dashboard-duck-wrap">
+          <DuckRecordButton authenticated={Boolean(token)} />
+        </div>
+      </section>
+
+      {!token ? (
+        <section className="dashboard-auth-actions" aria-label="Sign in or sign up">
+          <Link to="/login" className="btn-gold btn-gold--dashboard">
+            Sign in
+          </Link>
+          <Link to="/register" className="btn-gold btn-gold--outline btn-gold--dashboard">
+            Sign up
+          </Link>
+        </section>
+      ) : null}
+
+      {token && loading && items === null ? (
+        <section aria-busy="true">
+          <p className="muted">Loading entries…</p>
+        </section>
+      ) : null}
+
+      {token && error ? (
+        <section>
+          <p>Could not load entries.</p>
+          <p className="text-error" style={{ marginTop: "0.5rem" }}>
+            {error}
+          </p>
+          <p style={{ marginTop: "0.75rem" }}>
+            <Link to="/login" className="btn-gold">
+              Sign in again
             </Link>
-            <div style={styles.meta}>
-              {formatWhen(entry.created_at)} · {entry.source}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
+          </p>
+        </section>
+      ) : null}
+
+      {token && !loading && !error && (items?.length ?? 0) === 0 ? (
+        <section className="empty-state" aria-live="polite">
+          <p style={{ margin: 0 }}>No journal entries yet.</p>
+          <p className="muted" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
+            Use the duck above to speak your first thought and save it here.
+          </p>
+        </section>
+      ) : null}
+
+      {token && items && items.length > 0 ? (
+        <section>
+          <h3 className="section-label">Recent entries</h3>
+          <ul className="entry-list">
+            {items.map((entry) => (
+              <li key={entry.id}>
+                <Link
+                  to={`/entries/${entry.id}`}
+                  className="entry-card-link"
+                >
+                  <strong style={{ fontWeight: 600 }}>{previewText(entry)}</strong>
+                  <div className="entry-card-meta">
+                    {formatWhen(entry.created_at)} · {entry.source}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </>
   );
 }
