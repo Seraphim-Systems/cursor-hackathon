@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/entry-list.json",
+  "title": "JournalEntryListResponse",
+  "description": "Response for GET /api/entries",
+  "type": "object",
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": { "$ref": "./journal-entry.schema.json" }
+    },
+    "total": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

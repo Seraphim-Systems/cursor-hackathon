@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/health.json",
+  "title": "HealthResponse",
+  "description": "Response for GET /api/health",
+  "type": "object",
+  "required": ["status", "database"],
+  "properties": {
+    "status": { "type": "string", "const": "ok" },
+    "database": { "type": "string", "enum": ["connected", "disconnected"] },
+    "transcription_adapter": { "type": "string" },
+    "analysis_adapter": { "type": "string" }
+  },
+  "additionalProperties": true
+}
