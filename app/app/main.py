@@ -1,11 +1,19 @@
+<<<<<<< Updated upstream
 from contextlib import asynccontextmanager
 from typing import Any
 
 from beanie import init_beanie
+=======
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
+>>>>>>> Stashed changes
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 
+<<<<<<< Updated upstream
 from app.api.routers import auth, calendar, entries, projects, settings as settings_router
 from app.config import settings
 from app.infrastructure.adapters import build_analyzer, build_transcriber
@@ -16,16 +24,35 @@ from app.infrastructure.persistence.documents import (
 )
 
 # Routers register on /api/*
+=======
+from app.api.routers import auth, settings as settings_router
+from app.config import settings
+from app.infrastructure.adapters import build_analyzer, build_transcriber
+from app.infrastructure.persistence.database import init_beanie
+
+logger = logging.getLogger(__name__)
+>>>>>>> Stashed changes
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     client = AsyncIOMotorClient(settings.mongodb_uri)
+<<<<<<< Updated upstream
     await init_beanie(
         database=client[settings.mongodb_db_name],
         document_models=[UserDocument, JournalEntryDocument, ProjectDocument],
     )
     app.state.mongo = client
+=======
+    app.state.mongo_client = client
+    try:
+        await client.admin.command("ping")
+        await init_beanie(client)
+    except Exception:
+        logger.exception(
+            "MongoDB ping or Beanie init failed; /api/health will report database disconnected"
+        )
+>>>>>>> Stashed changes
     yield
     client.close()
 
@@ -48,6 +75,7 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
+<<<<<<< Updated upstream
 app.include_router(entries.router, prefix="/api")
 app.include_router(projects.router, prefix="/api")
 app.include_router(calendar.router, prefix="/api")
@@ -65,8 +93,23 @@ async def health(request: Request) -> dict[str, Any]:
         except Exception:
             db_status = "disconnected"
 
+=======
+
+
+@app.get("/api/health")
+async def health(request: Request) -> dict:
+    """Liveness; DB connectivity + active transcription / analysis adapters."""
+>>>>>>> Stashed changes
     transcriber = build_transcriber(settings)
     analyzer = build_analyzer(settings)
+    client = getattr(request.app.state, "mongo_client", None)
+    db_status = "disconnected"
+    if client is not None:
+        try:
+            await asyncio.wait_for(client.admin.command("ping"), timeout=2.0)
+            db_status = "connected"
+        except Exception:
+            db_status = "disconnected"
     return {
         "status": "ok",
         "database": db_status,
