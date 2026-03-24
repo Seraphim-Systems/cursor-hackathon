@@ -1,3 +1,22 @@
+"""Beanie documents."""
+
+from typing import Annotated
+
+from beanie import Document, Indexed
+from pydantic import EmailStr, Field
+
+from app.schemas.user_settings import UserSettings
+
+
+class UserDocument(Document):
+    """User account; `settings` matches [`user-settings.schema.json`](../../../../contracts/user-settings.schema.json)."""
+
+    email: Annotated[EmailStr, Indexed(unique=True)]
+    hashed_password: str
+    settings: UserSettings = Field(default_factory=UserSettings)
+
+    class Settings:
+        name = "users"
 <<<<<<< HEAD
 <<<<<<< Updated upstream
 """Beanie documents — align with contracts/journal-entry and user-settings schemas."""

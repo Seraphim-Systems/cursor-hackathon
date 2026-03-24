@@ -1,3 +1,7 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
 <<<<<<< HEAD
 <<<<<<< Updated upstream
 from contextlib import asynccontextmanager
@@ -16,8 +20,9 @@ import logging
 from contextlib import asynccontextmanager
 
 >>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Request
 from fastapi.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
 from motor.motor_asyncio import AsyncIOMotorClient
 
 <<<<<<< HEAD
@@ -42,8 +47,28 @@ logger = logging.getLogger(__name__)
 >>>>>>> Stashed changes
 =======
 from app.api.routers import auth, settings as settings_router
+from app.api.routers import auth, settings as settings_router
 from app.config import settings
 from app.infrastructure.adapters import build_analyzer, build_transcriber
+from app.infrastructure.persistence.database import init_beanie
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    client = AsyncIOMotorClient(settings.mongodb_uri)
+    app.state.mongo_client = client
+    try:
+        await client.admin.command("ping")
+        await init_beanie(client)
+    except Exception:
+        logger.exception(
+            "MongoDB ping or Beanie init failed; /api/health will report database disconnected"
+        )
+    yield
+    client.close()
+
 from app.infrastructure.persistence.database import init_beanie
 
 logger = logging.getLogger(__name__)
@@ -97,6 +122,9 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
+
+app.include_router(auth.router, prefix="/api")
+app.include_router(settings_router.router, prefix="/api")
 <<<<<<< HEAD
 <<<<<<< Updated upstream
 app.include_router(entries.router, prefix="/api")
@@ -129,9 +157,16 @@ async def health(request: Request) -> dict:
 @app.get("/api/health")
 async def health(request: Request) -> dict:
     """Liveness; DB connectivity + active transcription / analysis adapters."""
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
     transcriber = build_transcriber(settings)
     analyzer = build_analyzer(settings)
+    client = getattr(request.app.state, "mongo_client", None)
+    db_status = "disconnected"
+    if client is not None:
+        try:
+            await asyncio.wait_for(client.admin.command("ping"), timeout=2.0)
+            db_status = "connected"
+        except Exception:
+            db_status = "disconnected"
     client = getattr(request.app.state, "mongo_client", None)
     db_status = "disconnected"
     if client is not None:
