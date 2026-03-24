@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/project-list.json",
+  "title": "ProjectListResponse",
+  "description": "Response for GET /api/projects",
+  "type": "object",
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": { "$ref": "./project-resource.schema.json" }
+    }
+  },
+  "additionalProperties": false
+}

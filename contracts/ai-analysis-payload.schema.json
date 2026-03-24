@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/ai-analysis-payload.json",
+  "title": "AIAnalysisPayload",
+  "description": "JSON object returned by the LLM and validated before mapping to entry summary, sentiment_score, and insights (internal contract; mirrors domain.ai_payload in app).",
+  "type": "object",
+  "properties": {
+    "summary": { "type": ["string", "null"] },
+    "sentiment_score": { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
+    "key_points": { "type": "array", "items": { "type": "string" } },
+    "projects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "goals": { "type": "array", "items": { "type": "string" } },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "people": { "type": "array", "items": { "type": "string" } },
+    "priorities": { "type": "array", "items": { "type": "string" } },
+    "themes": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

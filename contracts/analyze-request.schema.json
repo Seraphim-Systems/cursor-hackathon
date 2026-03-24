@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/analyze-request.json",
+  "title": "EntryAnalyzeRequest",
+  "description": "Optional JSON body for POST /api/entries/{id}/analyze",
+  "type": "object",
+  "properties": {
+    "preserve_locked_fields": { "type": "boolean", "default": true }
+  },
+  "additionalProperties": false
+}

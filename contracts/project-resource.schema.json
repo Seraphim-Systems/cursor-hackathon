@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/project-resource.json",
+  "title": "Project",
+  "description": "Single project resource (list item or PATCH response)",
+  "type": "object",
+  "required": [
+    "id",
+    "user_id",
+    "title",
+    "normalized_name",
+    "related_entry_ids",
+    "first_seen_at",
+    "last_mentioned_at"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "user_id": { "type": "string" },
+    "title": { "type": "string" },
+    "normalized_name": { "type": "string" },
+    "description": { "type": ["string", "null"] },
+    "status": { "type": ["string", "null"] },
+    "related_entry_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "first_seen_at": { "type": "string", "format": "date-time" },
+    "last_mentioned_at": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}

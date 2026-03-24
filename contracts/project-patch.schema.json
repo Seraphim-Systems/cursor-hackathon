@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/project-patch.json",
+  "title": "ProjectPatchRequest",
+  "description": "Partial body for PATCH /api/projects/{id}",
+  "type": "object",
+  "properties": {
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": ["string", "null"] },
+    "status": { "type": ["string", "null"], "maxLength": 80 }
+  },
+  "additionalProperties": false
+}

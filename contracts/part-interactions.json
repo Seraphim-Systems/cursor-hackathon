@@ -1,0 +1,248 @@
+{
+  "$comment": "Machine-readable map of work parts (P1–P3) to HTTP interactions and JSON Schema artifacts. Bump version when interactions change.",
+  "version": "1.0.0",
+  "parts": {
+    "1": {
+      "title": "Platform, persistence, identity",
+      "dependsOn": [],
+      "schemaFiles": [
+        "health.schema.json",
+        "auth-request.schema.json",
+        "auth-responses.schema.json",
+        "me-response.schema.json",
+        "user-settings.schema.json"
+      ],
+      "interactions": [
+        {
+          "id": "P1.health",
+          "method": "GET",
+          "path": "/api/health",
+          "requiresAuth": false,
+          "responseSchema": "health.schema.json",
+          "webSurfaces": ["bootstrap", "ops"]
+        },
+        {
+          "id": "P1.auth.register",
+          "method": "POST",
+          "path": "/api/auth/register",
+          "requiresAuth": false,
+          "requestSchema": "auth-request.schema.json",
+          "responseSchema": "auth-responses.schema.json",
+          "notes": "App may require password minLength 8; schema uses minLength 1 for shared login shape.",
+          "webSurfaces": ["login", "register"]
+        },
+        {
+          "id": "P1.auth.login",
+          "method": "POST",
+          "path": "/api/auth/login",
+          "requiresAuth": false,
+          "requestSchema": "auth-request.schema.json",
+          "responseSchema": "auth-responses.schema.json",
+          "webSurfaces": ["login"]
+        },
+        {
+          "id": "P1.auth.me",
+          "method": "GET",
+          "path": "/api/auth/me",
+          "requiresAuth": true,
+          "responseSchema": "me-response.schema.json",
+          "webSurfaces": ["layout", "settings"]
+        },
+        {
+          "id": "P1.settings.get",
+          "method": "GET",
+          "path": "/api/settings",
+          "requiresAuth": true,
+          "responseSchema": "user-settings.schema.json",
+          "webSurfaces": ["settings"]
+        },
+        {
+          "id": "P1.settings.patch",
+          "method": "PATCH",
+          "path": "/api/settings",
+          "requiresAuth": true,
+          "requestSchema": "user-settings.schema.json",
+          "responseSchema": "user-settings.schema.json",
+          "notes": "Request is partial; only sent keys are updated.",
+          "webSurfaces": ["settings"]
+        }
+      ]
+    },
+    "2": {
+      "title": "Journal domain, pipeline, supporting APIs",
+      "dependsOn": ["1"],
+      "schemaFiles": [
+        "journal-entry.schema.json",
+        "entry-patch.schema.json",
+        "insights.schema.json",
+        "entry-list.schema.json",
+        "analyze-request.schema.json",
+        "ai-analysis-payload.schema.json",
+        "project-resource.schema.json",
+        "project-patch.schema.json",
+        "project-list.schema.json",
+        "calendar-response.schema.json"
+      ],
+      "interactions": [
+        {
+          "id": "P2.entries.create",
+          "method": "POST",
+          "path": "/api/entries",
+          "requiresAuth": true,
+          "requestContentType": "multipart/form-data",
+          "requestFields": {
+            "text": { "type": "string", "optional": true },
+            "audio": { "type": "binary", "optional": true },
+            "run_analysis": { "type": "boolean", "optional": true, "default": true }
+          },
+          "responseSchema": "journal-entry.schema.json",
+          "notes": "At least one of text or audio required. Pipeline may call STT then AI; persists summary, sentiment_score, insights per contracts.",
+          "webSurfaces": ["record", "dashboard"]
+        },
+        {
+          "id": "P2.entries.list",
+          "method": "GET",
+          "path": "/api/entries",
+          "requiresAuth": true,
+          "queryParams": ["limit", "offset"],
+          "responseSchema": "entry-list.schema.json",
+          "webSurfaces": ["dashboard", "history"]
+        },
+        {
+          "id": "P2.entries.get",
+          "method": "GET",
+          "path": "/api/entries/{entry_id}",
+          "requiresAuth": true,
+          "responseSchema": "journal-entry.schema.json",
+          "webSurfaces": ["entry-detail"]
+        },
+        {
+          "id": "P2.entries.patch",
+          "method": "PATCH",
+          "path": "/api/entries/{entry_id}",
+          "requiresAuth": true,
+          "requestSchema": "entry-patch.schema.json",
+          "responseSchema": "journal-entry.schema.json",
+          "notes": "Partial resource update; insights and insights_field_locks editable.",
+          "webSurfaces": ["entry-detail"]
+        },
+        {
+          "id": "P2.entries.delete",
+          "method": "DELETE",
+          "path": "/api/entries/{entry_id}",
+          "requiresAuth": true,
+          "responseSchema": null,
+          "notes": "204 No Content; may delete audio from storage.",
+          "webSurfaces": ["entry-detail"]
+        },
+        {
+          "id": "P2.entries.upload_audio",
+          "method": "POST",
+          "path": "/api/entries/{entry_id}/audio",
+          "requiresAuth": true,
+          "requestContentType": "multipart/form-data",
+          "requestFields": {
+            "audio": { "type": "binary", "required": true },
+            "run_analysis": { "type": "boolean", "optional": true }
+          },
+          "responseSchema": "journal-entry.schema.json",
+          "webSurfaces": ["record", "entry-detail"]
+        },
+        {
+          "id": "P2.entries.analyze",
+          "method": "POST",
+          "path": "/api/entries/{entry_id}/analyze",
+          "requiresAuth": true,
+          "requestSchema": "analyze-request.schema.json",
+          "responseSchema": "journal-entry.schema.json",
+          "internalSchema": "ai-analysis-payload.schema.json",
+          "notes": "LLM output validated against ai-analysis-payload before mapping to entry fields; respects insights_field_locks when preserve_locked_fields true.",
+          "webSurfaces": ["entry-detail"]
+        },
+        {
+          "id": "P2.projects.list",
+          "method": "GET",
+          "path": "/api/projects",
+          "requiresAuth": true,
+          "responseSchema": "project-list.schema.json",
+          "webSurfaces": ["dashboard", "projects"]
+        },
+        {
+          "id": "P2.projects.patch",
+          "method": "PATCH",
+          "path": "/api/projects/{project_id}",
+          "requiresAuth": true,
+          "requestSchema": "project-patch.schema.json",
+          "responseSchema": "project-resource.schema.json",
+          "notes": "Partial update (title, description, status).",
+          "webSurfaces": ["projects", "entry-detail"]
+        },
+        {
+          "id": "P2.calendar",
+          "method": "GET",
+          "path": "/api/calendar",
+          "requiresAuth": true,
+          "queryParams": ["from", "to"],
+          "responseSchema": "calendar-response.schema.json",
+          "webSurfaces": ["calendar"]
+        }
+      ]
+    },
+    "3": {
+      "title": "Product UX and quality gates",
+      "dependsOn": ["1", "2"],
+      "schemaFiles": [],
+      "notes": "No new wire formats; consumes P1–P2 contracts only. Optional: OpenAPI codegen types for web/src.",
+      "interactions": [
+        {
+          "id": "P3.ui.session",
+          "client": "web",
+          "requiresPart": ["1"],
+          "notes": "Store access_token (P1.auth.*); send Authorization: Bearer on all P2 calls."
+        },
+        {
+          "id": "P3.ui.record_flow",
+          "client": "web",
+          "requiresPart": ["2"],
+          "usesInteractions": ["P2.entries.create", "P2.entries.upload_audio"],
+          "notes": "MediaRecorder → multipart upload; poll or navigate using journal-entry response."
+        },
+        {
+          "id": "P3.ui.insights_edit",
+          "client": "web",
+          "usesInteractions": ["P2.entries.patch", "P2.entries.analyze"],
+          "notes": "PATCH aligns with journal-entry + insights.schema.json; re-analyze uses analyze-request + locks."
+        },
+        {
+          "id": "P3.ui.browse",
+          "client": "web",
+          "usesInteractions": ["P2.entries.list", "P2.calendar", "P2.projects.list"],
+          "notes": "Field names must match entry-list, calendar-response, project-list schemas."
+        },
+        {
+          "id": "P3.quality.tests",
+          "client": "app",
+          "notes": "pytest + docker; domain tests for locks; API tests against running stack or testcontainers."
+        }
+      ]
+    }
+  },
+  "crossPartFlows": [
+    {
+      "id": "flow.auth_then_entries",
+      "sequence": ["P1.auth.login", "P2.entries.list"],
+      "contractChain": ["auth-responses.schema.json", "entry-list.schema.json"]
+    },
+    {
+      "id": "flow.record_transcribe_analyze",
+      "sequence": ["P1.auth.login", "P2.entries.create"],
+      "dataPath": ["multipart audio", "journal-entry (transcript, cleaned_text)", "journal-entry (summary, sentiment_score, insights)"],
+      "schemas": ["journal-entry.schema.json", "insights.schema.json", "ai-analysis-payload.schema.json"]
+    },
+    {
+      "id": "flow.reanalyze_with_locks",
+      "sequence": ["P2.entries.patch", "P2.entries.analyze"],
+      "schemas": ["journal-entry.schema.json", "analyze-request.schema.json", "insights.schema.json"]
+    }
+  ]
+}

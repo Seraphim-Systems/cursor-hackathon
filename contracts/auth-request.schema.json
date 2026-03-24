@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/auth-request.json",
+  "title": "AuthRegisterLoginRequest",
+  "description": "Body for POST /api/auth/register and POST /api/auth/login",
+  "type": "object",
+  "required": ["email", "password"],
+  "properties": {
+    "email": { "type": "string", "format": "email" },
+    "password": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

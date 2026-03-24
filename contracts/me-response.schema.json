@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/me-response.json",
+  "title": "AuthMeResponse",
+  "description": "Response for GET /api/auth/me",
+  "type": "object",
+  "required": ["user", "settings"],
+  "properties": {
+    "user": {
+      "type": "object",
+      "required": ["id", "email"],
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string", "format": "email" }
+      },
+      "additionalProperties": true
+    },
+    "settings": { "$ref": "./user-settings.schema.json" }
+  },
+  "additionalProperties": false
+}

@@ -79,5 +79,7 @@ Commit the updated `package-lock.json` if you want reproducible `npm ci` builds.
 - [app/README.md](app/README.md) — Python `.venv`, local `uvicorn` / `pytest`
 - [WORK_PLAN.md](WORK_PLAN.md) — 3 parts, subtasks, checks
 - [docs/DATA_CONTRACTS.md](docs/DATA_CONTRACTS.md) — REST shapes
+- [docs/PART_INTERACTIONS.md](docs/PART_INTERACTIONS.md) — Part 1–3 interactions (human-readable)
+- [contracts/part-interactions.json](contracts/part-interactions.json) — same mapping (machine-readable)
 - [docs/FILE_STRUCTURE.md](docs/FILE_STRUCTURE.md) — repository layout
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — secrets and CI/CD

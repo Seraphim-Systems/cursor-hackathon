@@ -2,6 +2,8 @@
 
 Canonical shapes for REST JSON bodies and embedded documents. JSON Schema sources live under [`contracts/`](../contracts/).
 
+**Work-plan interactions (Part 1–3):** see [`PART_INTERACTIONS.md`](PART_INTERACTIONS.md) and the machine-readable registry [`../contracts/part-interactions.json`](../contracts/part-interactions.json).
+
 Global conventions:
 
 - **Dates:** ISO 8601 strings (e.g. `2025-03-24T12:00:00Z`) unless noted.

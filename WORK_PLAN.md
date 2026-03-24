@@ -1,6 +1,6 @@
 # Journaling app — work breakdown (3 parts)
 
-This document splits delivery into **three parts**, each with **subtasks**, **checks** (definition of done / verification), and **data contracts** (see [`contracts/`](contracts/) and [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md)).
+This document splits delivery into **three parts**, each with **subtasks**, **checks** (definition of done / verification), and **data contracts** (see [`contracts/`](contracts/), [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md), and **[`docs/PART_INTERACTIONS.md`](docs/PART_INTERACTIONS.md)** / [`contracts/part-interactions.json`](contracts/part-interactions.json) for **P1–P3 interaction mapping**).
 
 **Environment:** **Docker Compose** runs **`mongo`**, **`stt`**, **`app`** (API under [`app/`](app/)), **`web`** (UI under [`web/`](web/)). For the API only, a local **[`app/.venv`](app/README.md)** is supported for `pytest`, editors, and host `uvicorn` (see [`app/README.md`](app/README.md)); the **`web`** app can stay fully containerized. Copy [`.env.example`](.env.example) → **`.env`** for local secrets (gitignored); for pipelines use encrypted **git secrets** as in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Dev overrides: [`docker-compose.dev.yml`](docker-compose.dev.yml).
 
@@ -19,7 +19,7 @@ This document splits delivery into **three parts**, each with **subtasks**, **ch
 | P1.5 | Settings: `GET/PATCH /api/settings` scoped to user | PATCH round-trip persists per [`contracts/user-settings.schema.json`](contracts/user-settings.schema.json) |
 | P1.6 | Web: Vite + React + router, login page, API client with token storage, protected route stub | Login reaches API (`app` service); dashboard placeholder behind auth |
 
-**Data contracts for Part 1:** [`contracts/auth-responses.schema.json`](contracts/auth-responses.schema.json), [`contracts/user-settings.schema.json`](contracts/user-settings.schema.json), §Auth and §Settings in [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md).
+**Data contracts for Part 1:** [`contracts/auth-responses.schema.json`](contracts/auth-responses.schema.json), [`contracts/auth-request.schema.json`](contracts/auth-request.schema.json), [`contracts/me-response.schema.json`](contracts/me-response.schema.json), [`contracts/health.schema.json`](contracts/health.schema.json), [`contracts/user-settings.schema.json`](contracts/user-settings.schema.json), §Auth and §Settings in [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md); interactions: [`contracts/part-interactions.json`](contracts/part-interactions.json) → `parts["1"]`.
 
 ---
 
@@ -37,7 +37,7 @@ This document splits delivery into **three parts**, each with **subtasks**, **ch
 | P2.6 | `ProjectDocument` + auto create/update from AI `projects`; `GET/PATCH /api/projects` | New name creates row; repeat mentions update `last_mentioned_at` |
 | P2.7 | `GET /api/calendar?from=&to=` — entries grouped by UTC date (or user tz from settings) | Response shape per [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md) §Calendar |
 
-**Data contracts for Part 2:** [`contracts/journal-entry.schema.json`](contracts/journal-entry.schema.json), [`contracts/insights.schema.json`](contracts/insights.schema.json), §Entries, §Insights, §Calendar, §Projects in [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md).
+**Data contracts for Part 2:** [`contracts/journal-entry.schema.json`](contracts/journal-entry.schema.json), [`contracts/entry-patch.schema.json`](contracts/entry-patch.schema.json), [`contracts/entry-list.schema.json`](contracts/entry-list.schema.json), [`contracts/insights.schema.json`](contracts/insights.schema.json), [`contracts/analyze-request.schema.json`](contracts/analyze-request.schema.json), [`contracts/ai-analysis-payload.schema.json`](contracts/ai-analysis-payload.schema.json), [`contracts/project-resource.schema.json`](contracts/project-resource.schema.json), [`contracts/project-patch.schema.json`](contracts/project-patch.schema.json), [`contracts/project-list.schema.json`](contracts/project-list.schema.json), [`contracts/calendar-response.schema.json`](contracts/calendar-response.schema.json), §Entries–Calendar in [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md); interactions: [`contracts/part-interactions.json`](contracts/part-interactions.json) → `parts["2"]`.
 
 ---
 
@@ -54,7 +54,7 @@ This document splits delivery into **three parts**, each with **subtasks**, **ch
 | P3.5 | Tests: domain (locks, project dedup), facade with mocked ports, critical API tests | `docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app pytest`; web production build via `docker compose build web` (no local `npm`) |
 | P3.6 | README: prerequisites, `docker compose up`, default URLs, env vars | New developer can start stack from README only |
 
-**Data contracts for Part 3:** Same as Parts 1–2; UI must not invent field names—use OpenAPI or [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md) as source of truth.
+**Data contracts for Part 3:** Same wire formats as Parts 1–2; UI must not invent field names—use OpenAPI, [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md), and [`docs/PART_INTERACTIONS.md`](docs/PART_INTERACTIONS.md) (Part 3 section / `parts["3"]` in [`contracts/part-interactions.json`](contracts/part-interactions.json)) as source of truth.
 
 ---
 
@@ -62,7 +62,7 @@ This document splits delivery into **three parts**, each with **subtasks**, **ch
 
 - **Secrets:** No keys committed; only [`.env.example`](.env.example) documents variables.
 - **Layering:** `domain/` does not import FastAPI, Beanie, or HTTP client libraries.
-- **Contracts:** Breaking API or storage shape changes require updating `contracts/*.json` and [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md).
+- **Contracts:** Breaking API or storage shape changes require updating `contracts/*.json`, [`contracts/part-interactions.json`](contracts/part-interactions.json) (version + affected `interactions`), [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md), and [`docs/PART_INTERACTIONS.md`](docs/PART_INTERACTIONS.md) when cross-part behavior changes.
 
 ---
 
