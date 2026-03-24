@@ -25,12 +25,13 @@ class Settings(BaseSettings):
     # Optional cloud key (also used when AI base URL points to OpenAI-compatible hosts)
     openai_api_key: str | None = None
 
-    # Transcription: "stub" | "http_stt" (generic multipart POST to local/container STT)
+    # Transcription: "stub" | "http_stt" | "openai" (Whisper-compatible HTTP API)
     transcription_provider: str = "http_stt"
     stt_base_url: str = "http://stt:9000"
     stt_transcribe_path: str = "/asr"
     stt_form_field: str = "audio_file"
     stt_timeout_seconds: float = 600.0
+    transcription_openai_model: str = "whisper-1"
 
     # AI analysis: "stub" | "openai" (OpenAI-compatible Chat Completions HTTP API)
     ai_analysis_provider: str = "stub"
