@@ -1,7 +1,7 @@
 """AI analysis via OpenAI-compatible Chat Completions (HTTP).
 
 Use any base URL that implements `POST /chat/completions` (OpenAI, Azure OpenAI path-style,
-or local proxies). Responses are requested as JSON objects matching `AnalysisResult` fields.
+or local proxies). Responses are validated with `domain.ai_payload.AIAnalysisPayload`.
 """
 
 import json
@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 
+from app.domain.ai_payload import AIAnalysisPayload
 from app.domain.protocols import AnalysisResult, IAIAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -80,57 +81,27 @@ class OpenAiCompatAnalyzer:
             raise ValueError("AI response missing message content")
 
         try:
-            parsed = json.loads(content)
+            raw = json.loads(content)
         except json.JSONDecodeError as e:
             raise ValueError("AI returned non-JSON content") from e
 
-        return _to_analysis_result(parsed)
-
-
-def _to_analysis_result(raw: dict[str, Any]) -> AnalysisResult:
-    projects_in = raw.get("projects") or []
-    projects: list[dict] = []
-    for p in projects_in:
-        if isinstance(p, dict) and "name" in p:
-            name = str(p.get("name", "")).strip()
-            if name:
-                projects.append(
-                    {
-                        "name": name,
-                        "notes": str(p.get("notes") or ""),
-                    }
-                )
-        elif isinstance(p, str) and p.strip():
-            projects.append({"name": p.strip(), "notes": ""})
-
-    def str_list(key: str) -> list[str]:
-        v = raw.get(key)
-        if not isinstance(v, list):
-            return []
-        out: list[str] = []
-        for item in v:
-            if isinstance(item, str) and item.strip():
-                out.append(item.strip())
-        return out
-
-    sentiment = raw.get("sentiment_score")
-    if sentiment is not None:
         try:
-            sentiment = float(sentiment)
-        except (TypeError, ValueError):
-            sentiment = None
+            validated = AIAnalysisPayload.model_validate(raw)
+        except Exception as e:
+            raise ValueError(f"AI JSON did not match analysis contract: {e}") from e
 
-    summary = raw.get("summary")
-    summary_str = str(summary).strip() if summary is not None else None
+        return _payload_to_result(validated)
 
+
+def _payload_to_result(p: AIAnalysisPayload) -> AnalysisResult:
     return AnalysisResult(
-        summary=summary_str or None,
-        sentiment_score=sentiment,
-        key_points=str_list("key_points"),
-        projects=projects,
-        goals=str_list("goals"),
-        blockers=str_list("blockers"),
-        people=str_list("people"),
-        priorities=str_list("priorities"),
-        themes=str_list("themes"),
+        summary=(p.summary.strip() if isinstance(p.summary, str) and p.summary.strip() else None),
+        sentiment_score=p.sentiment_score,
+        key_points=list(p.key_points),
+        projects=[{"name": x.name, "notes": x.notes} for x in p.projects],
+        goals=list(p.goals),
+        blockers=list(p.blockers),
+        people=list(p.people),
+        priorities=list(p.priorities),
+        themes=list(p.themes),
     )
