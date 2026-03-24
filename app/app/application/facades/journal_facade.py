@@ -8,7 +8,8 @@ from app.domain.insight_apply import apply_analysis_to_entry
 from app.domain.project_normalize import normalized_project_name
 from app.domain.protocols import IAIAnalyzer, IAudioStorage, ITranscriber
 from app.domain.text_utils import compose_cleaned_text
-from app.infrastructure.persistence.documents import JournalEntryDocument, ProjectDocument, SourceKind
+from app.infrastructure.persistence.documents import JournalEntryDocument, SourceKind
+from app.infrastructure.persistence.project_document import ProjectDocument
 from app.infrastructure.persistence.repositories import JournalEntryRepository, ProjectRepository
 
 

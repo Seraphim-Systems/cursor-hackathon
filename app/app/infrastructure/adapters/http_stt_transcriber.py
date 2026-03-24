@@ -14,7 +14,7 @@ from app.domain.protocols import ITranscriber, TranscriptionResult
 logger = logging.getLogger(__name__)
 
 
-def _filename_for_mime(mime_type: str | None) -> str:
+def audio_filename_for_mime(mime_type: str | None) -> str:
     if not mime_type:
         return "audio.bin"
     m = mime_type.lower().split("/")[-1].split(";")[0].strip()
@@ -43,7 +43,7 @@ class HttpSttTranscriber:
 
     async def transcribe(self, *, audio_bytes: bytes, mime_type: str | None) -> TranscriptionResult:
         url = urljoin(self._base, self._path)
-        filename = _filename_for_mime(mime_type)
+        filename = audio_filename_for_mime(mime_type)
         # whisper-asr-webservice: default `output=txt` returns plain text body.
         params = {"task": "transcribe", "output": "txt"}
         files = {self._form_field: (filename, audio_bytes, mime_type or "application/octet-stream")}

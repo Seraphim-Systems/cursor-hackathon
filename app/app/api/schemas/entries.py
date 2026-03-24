@@ -12,18 +12,18 @@ from app.infrastructure.persistence.documents import JournalEntryDocument
 SourceKind = Literal["text", "audio", "mixed"]
 
 
-class ProjectItemResponse(BaseModel):
+class InsightProjectOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    notes: str = ""
+    notes: str | None = None
 
 
-class InsightsResponse(BaseModel):
+class InsightsOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     key_points: list[str] = Field(default_factory=list)
-    projects: list[ProjectItemResponse] = Field(default_factory=list)
+    projects: list[InsightProjectOut] = Field(default_factory=list)
     goals: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
     people: list[str] = Field(default_factory=list)
@@ -31,10 +31,10 @@ class InsightsResponse(BaseModel):
     themes: list[str] = Field(default_factory=list)
 
 
-class JournalEntryResponse(BaseModel):
+class JournalEntryOut(BaseModel):
     """Journal entry resource (data contract)."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
     id: str
     user_id: str
@@ -45,15 +45,30 @@ class JournalEntryResponse(BaseModel):
     transcript: str | None = None
     cleaned_text: str | None = None
     summary: str | None = None
-    sentiment_score: float | None = None
-    insights: InsightsResponse
+    sentiment_score: float | None = Field(default=None, ge=-1, le=1)
+    insights: InsightsOut | None = None
     insights_field_locks: list[str] = Field(default_factory=list)
 
 
-def entry_to_response(doc: JournalEntryDocument) -> JournalEntryResponse:
-    return JournalEntryResponse(
+def journal_entry_to_out(doc: JournalEntryDocument) -> JournalEntryOut:
+    raw = doc.insights
+    if not raw or not any(
+        [
+            raw.key_points,
+            raw.projects,
+            raw.goals,
+            raw.blockers,
+            raw.people,
+            raw.priorities,
+            raw.themes,
+        ]
+    ):
+        insights = None
+    else:
+        insights = InsightsOut.model_validate(raw.model_dump(mode="json"))
+    return JournalEntryOut(
         id=str(doc.id),
-        user_id=doc.user_id,
+        user_id=str(doc.user_id),
         source=doc.source,
         created_at=doc.created_at,
         updated_at=doc.updated_at,
@@ -62,16 +77,42 @@ def entry_to_response(doc: JournalEntryDocument) -> JournalEntryResponse:
         cleaned_text=doc.cleaned_text,
         summary=doc.summary,
         sentiment_score=doc.sentiment_score,
-        insights=InsightsResponse(
-            key_points=list(doc.insights.key_points),
-            projects=[
-                ProjectItemResponse(name=p.name, notes=p.notes) for p in doc.insights.projects
-            ],
-            goals=list(doc.insights.goals),
-            blockers=list(doc.insights.blockers),
-            people=list(doc.insights.people),
-            priorities=list(doc.insights.priorities),
-            themes=list(doc.insights.themes),
-        ),
+        insights=insights,
         insights_field_locks=list(doc.insights_field_locks),
     )
+
+
+# Back-compat names used elsewhere
+JournalEntryResponse = JournalEntryOut
+entry_to_response = journal_entry_to_out
+
+
+class JournalEntryCreateBody(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    source: SourceKind
+    audio_storage_key: str | None = None
+    transcript: str | None = None
+    cleaned_text: str | None = None
+    summary: str | None = None
+    sentiment_score: float | None = Field(default=None, ge=-1, le=1)
+    insights: InsightsOut | None = None
+    insights_field_locks: list[str] | None = None
+
+
+class JournalEntryPatchBody(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    source: SourceKind | None = None
+    audio_storage_key: str | None = None
+    transcript: str | None = None
+    cleaned_text: str | None = None
+    summary: str | None = None
+    sentiment_score: float | None = Field(default=None, ge=-1, le=1)
+    insights: InsightsOut | None = None
+    insights_field_locks: list[str] | None = None
+
+
+class JournalEntryListResponse(BaseModel):
+    items: list[JournalEntryOut]
+    total: int

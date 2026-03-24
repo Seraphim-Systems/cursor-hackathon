@@ -1,33 +1,38 @@
-"""Beanie documents — align with contracts/journal-entry and user-settings schemas."""
+"""Beanie document models — aligned with contracts and the Part 2 journal pipeline."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Literal
 
-from beanie import Document
-from pydantic import BaseModel, Field
+from beanie import Document, Indexed
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from pymongo import ASCENDING, DESCENDING, IndexModel
 
 SourceKind = Literal["text", "audio", "mixed"]
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 class UserSettingsEmbedded(BaseModel):
-    timezone: str = "UTC"
-    week_starts_on: Literal["monday", "sunday"] = "monday"
-    default_audio_quality: Literal["low", "medium", "high"] = "medium"
-    theme: Literal["light", "dark", "system"] = "system"
-    notifications_enabled: bool = True
+    model_config = ConfigDict(extra="allow")
+
+    timezone: str | None = None
+    week_starts_on: Literal["monday", "sunday"] | None = None
+    default_audio_quality: Literal["low", "medium", "high"] | None = None
+    theme: Literal["light", "dark", "system"] | None = None
+    notifications_enabled: bool | None = None
 
 
 class UserDocument(Document):
-    email: str
+    email: Indexed(EmailStr, unique=True)
     hashed_password: str
     settings: UserSettingsEmbedded = Field(default_factory=UserSettingsEmbedded)
 
     class Settings:
         name = "users"
-        indexes = [IndexModel([("email", ASCENDING)], unique=True)]
 
 
 class ProjectItem(BaseModel):
@@ -51,7 +56,7 @@ class InsightsEmbedded(BaseModel):
 
 class JournalEntryDocument(Document):
     user_id: str
-    source: SourceKind
+    source: SourceKind = "text"
     audio_storage_key: str | None = None
     transcript: str | None = None
     cleaned_text: str | None = None
@@ -59,28 +64,11 @@ class JournalEntryDocument(Document):
     sentiment_score: float | None = Field(default=None, ge=-1, le=1)
     insights: InsightsEmbedded = Field(default_factory=InsightsEmbedded)
     insights_field_locks: list[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
 
     class Settings:
         name = "journal_entries"
         indexes = [
             IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)]),
-        ]
-
-
-class ProjectDocument(Document):
-    user_id: str
-    title: str
-    normalized_name: str
-    description: str | None = None
-    first_seen_at: datetime
-    last_mentioned_at: datetime
-    related_entry_ids: list[str] = Field(default_factory=list)
-    status: str | None = None
-
-    class Settings:
-        name = "projects"
-        indexes = [
-            IndexModel([("user_id", ASCENDING), ("normalized_name", ASCENDING)], unique=True),
         ]

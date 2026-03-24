@@ -7,7 +7,8 @@ from typing import Any
 
 from beanie import PydanticObjectId
 
-from app.infrastructure.persistence.documents import JournalEntryDocument, ProjectDocument, UserDocument
+from app.infrastructure.persistence.documents import JournalEntryDocument, UserDocument
+from app.infrastructure.persistence.project_document import ProjectDocument
 
 
 def oid(val: str) -> PydanticObjectId:

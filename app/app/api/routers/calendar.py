@@ -1,48 +1,58 @@
-from __future__ import annotations
+"""Calendar aggregation (P2.7)."""
 
-from collections import defaultdict
 from datetime import date
 
-from fastapi import APIRouter, Query
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from app.api.deps import UserDep
-from app.infrastructure.persistence.repositories import JournalEntryRepository
+from app.domain.calendar_agg import (
+    build_calendar_days,
+    resolve_calendar_tz,
+    utc_bounds_for_local_date_range,
+)
+from app.infrastructure.persistence.documents import JournalEntryDocument
 
-router = APIRouter(prefix="/calendar", tags=["calendar"])
+router = APIRouter(tags=["calendar"])
+
+MAX_CALENDAR_RANGE_DAYS = 400
 
 
-class CalendarDay(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    date: str
+class CalendarDayOut(BaseModel):
+    date: str = Field(..., description="YYYY-MM-DD in the user's calendar (or UTC if no tz)")
     entry_ids: list[str]
     count: int
 
 
-class CalendarOut(BaseModel):
-    days: list[CalendarDay] = Field(default_factory=list)
+class CalendarResponse(BaseModel):
+    days: list[CalendarDayOut]
 
 
-@router.get("", response_model=CalendarOut)
-async def calendar(
+@router.get("/calendar", response_model=CalendarResponse)
+async def get_calendar(
     user: UserDep,
-    from_: date | None = Query(default=None, alias="from"),
-    to: date | None = Query(default=None),
-) -> CalendarOut:
-    repo = JournalEntryRepository()
-    entries = await repo.list_for_user(
-        str(user.id),
-        skip=0,
-        limit=5000,
-        from_date=from_,
-        to_date=to,
+    from_: date = Query(..., alias="from"),
+    to: date = Query(...),
+) -> CalendarResponse:
+    if from_ > to:
+        raise HTTPException(status_code=400, detail="'from' must be on or before 'to'")
+    if (to - from_).days > MAX_CALENDAR_RANGE_DAYS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Date range must not exceed {MAX_CALENDAR_RANGE_DAYS} days",
+        )
+
+    tz = resolve_calendar_tz(user.settings.timezone)
+    start_utc, end_utc_exclusive = utc_bounds_for_local_date_range(from_, to, tz)
+
+    entries = await JournalEntryDocument.find(
+        JournalEntryDocument.user_id == str(user.id),
+        JournalEntryDocument.created_at >= start_utc,
+        JournalEntryDocument.created_at < end_utc_exclusive,
+    ).to_list()
+
+    pairs = [(str(doc.id), doc.created_at) for doc in entries]
+    raw_days = build_calendar_days(pairs, from_, to, tz)
+    return CalendarResponse(
+        days=[CalendarDayOut(**d) for d in raw_days],
     )
-    by_day: dict[str, list[str]] = defaultdict(list)
-    for e in entries:
-        d = e.created_at.date().isoformat()
-        by_day[d].append(str(e.id))
-    days = [
-        CalendarDay(date=k, entry_ids=v, count=len(v)) for k, v in sorted(by_day.items())
-    ]
-    return CalendarOut(days=days)
