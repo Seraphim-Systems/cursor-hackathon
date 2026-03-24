@@ -35,6 +35,8 @@ services:
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
       AUDIO_STORAGE_PATH: ${AUDIO_STORAGE_PATH:-/data/audio}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:80,http://localhost}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER:-http_stt}
       STT_BASE_URL: ${STT_BASE_URL:-http://stt:9000}

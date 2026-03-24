@@ -2,7 +2,7 @@
 
 This document splits delivery into **three parts**, each with **subtasks**, **checks** (definition of done / verification), and **data contracts** (see [`contracts/`](contracts/), [`docs/DATA_CONTRACTS.md`](docs/DATA_CONTRACTS.md), and **[`docs/PART_INTERACTIONS.md`](docs/PART_INTERACTIONS.md)** / [`contracts/part-interactions.json`](contracts/part-interactions.json) for **P1–P3 interaction mapping**).
 
-**Environment:** **Docker Compose** runs **`mongo`**, **`stt`**, **`app`** (API under [`app/`](app/)), **`web`** (UI under [`web/`](web/)). For the API only, a local **[`app/.venv`](app/README.md)** is supported for `pytest`, editors, and host `uvicorn` (see [`app/README.md`](app/README.md)); the **`web`** app can stay fully containerized. Copy [`.env.example`](.env.example) → **`.env`** for local secrets (gitignored); for pipelines use encrypted **git secrets** as in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Dev overrides: [`docker-compose.dev.yml`](docker-compose.dev.yml).
+**Environment:** **Docker Compose** runs **`mongo`**, **`stt`**, **`app`** (API under [`app/`](app/)), **`web`** (UI under [`web/`](web/)). For the API only, a local **[`app/.venv`](app/README.md)** is supported for `pytest`, editors, and host `uvicorn` (see [`app/README.md`](app/README.md)); for **`web`**, use **Docker only** for `npm`/`Vite` (see [README.md](README.md) — do not install Node on the host). Copy [`.env.example`](.env.example) → **`.env`** for local secrets (gitignored); for pipelines use encrypted **git secrets** as in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Dev overrides: [`docker-compose.dev.yml`](docker-compose.dev.yml).
 
 ---
 
