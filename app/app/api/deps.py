@@ -1,5 +1,6 @@
 """FastAPI dependencies."""
 
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 from __future__ import annotations
 
@@ -58,6 +59,8 @@ def get_auth_facade() -> AuthFacade:
 JournalFacadeDep = Annotated[JournalFacade, Depends(get_journal_facade)]
 AuthFacadeDep = Annotated[AuthFacade, Depends(get_auth_facade)]
 =======
+=======
+>>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
 from beanie import PydanticObjectId
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -95,4 +98,7 @@ async def get_current_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+<<<<<<< HEAD
 >>>>>>> Stashed changes
+=======
+>>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)

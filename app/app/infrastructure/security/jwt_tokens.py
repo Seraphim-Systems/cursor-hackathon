@@ -27,10 +27,19 @@ def decode_access_token(token: str) -> dict:
 
 
 def decode_subject(token: str) -> str | None:
+<<<<<<< HEAD
     """Return JWT `sub` (user id) or None if invalid/expired."""
+=======
+    """Return JWT `sub` claim or None if invalid/expired."""
+
+>>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
     try:
         payload = decode_access_token(token)
     except ValueError:
         return None
     sub = payload.get("sub")
+<<<<<<< HEAD
     return sub if isinstance(sub, str) else None
+=======
+    return str(sub) if sub is not None else None
+>>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)

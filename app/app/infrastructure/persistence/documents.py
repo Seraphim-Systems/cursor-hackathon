@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 """Beanie documents — align with contracts/journal-entry and user-settings schemas."""
 
@@ -86,6 +87,8 @@ class ProjectDocument(Document):
             IndexModel([("user_id", ASCENDING), ("normalized_name", ASCENDING)], unique=True),
         ]
 =======
+=======
+>>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
 """Beanie documents."""
 
 from typing import Annotated
@@ -105,4 +108,7 @@ class UserDocument(Document):
 
     class Settings:
         name = "users"
+<<<<<<< HEAD
 >>>>>>> Stashed changes
+=======
+>>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)

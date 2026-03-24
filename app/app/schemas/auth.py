@@ -1,12 +1,17 @@
+<<<<<<< HEAD
 """Auth request/response shapes — aligned with `contracts/auth-*.schema.json` and `me-response.schema.json`."""
 
 from typing import Literal
+=======
+"""Auth request/response shapes — aligned with contracts/auth-*.schema.json."""
+>>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
 
 from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.user_settings import UserSettings
 
 
+<<<<<<< HEAD
 class AuthCredentials(BaseModel):
     """Body for `POST /api/auth/register` and `POST /api/auth/login` — see `auth-request.schema.json`."""
 
@@ -16,6 +21,16 @@ class AuthCredentials(BaseModel):
 
 RegisterRequest = AuthCredentials
 LoginRequest = AuthCredentials
+=======
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+>>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
 
 
 class UserPublic(BaseModel):
@@ -25,7 +40,11 @@ class UserPublic(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+<<<<<<< HEAD
     token_type: Literal["bearer"] = "bearer"
+=======
+    token_type: str = "bearer"
+>>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
     expires_in: int
     user: UserPublic
 
