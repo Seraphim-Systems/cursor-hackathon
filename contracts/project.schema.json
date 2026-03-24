@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cursor-hackathon.local/schemas/journal/project.json",
+  "title": "Project",
+  "type": "object",
+  "required": [
+    "id",
+    "user_id",
+    "title",
+    "normalized_name",
+    "first_seen_at",
+    "last_mentioned_at",
+    "related_entry_ids"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "user_id": { "type": "string" },
+    "title": { "type": "string" },
+    "normalized_name": { "type": "string" },
+    "description": { "type": ["string", "null"] },
+    "first_seen_at": { "type": "string", "format": "date-time" },
+    "last_mentioned_at": { "type": "string", "format": "date-time" },
+    "related_entry_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "status": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

@@ -9,6 +9,20 @@ from beanie import PydanticObjectId
 from app.infrastructure.persistence.documents import UserDocument
 from app.schemas.user_settings import UserSettings
 
+from app.infrastructure.persistence.documents import JournalEntryDocument, ProjectDocument, UserDocument
+from app.infrastructure.persistence.documents import JournalEntryDocument, UserDocument
+from app.infrastructure.persistence.project_document import ProjectDocument
+from __future__ import annotations
+
+from datetime import date, datetime, time, timezone
+"""Repositories for Beanie documents."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from beanie import PydanticObjectId
+
 
 def normalize_email(email: str) -> str:
     """Lowercase + trim for unique index and lookups (case-insensitive identity)."""
@@ -56,32 +70,6 @@ class UserRepository:
         user.settings = UserSettings.model_validate(current)
         await user.save()
         return user
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-"""Thin repository helpers over Beanie documents."""
-
-from __future__ import annotations
-
-from datetime import date, datetime, time, timezone
-=======
-=======
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
-"""Repositories for Beanie documents."""
-
-from __future__ import annotations
-
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
-from typing import Any
-
-from beanie import PydanticObjectId
-
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-from app.infrastructure.persistence.documents import JournalEntryDocument, ProjectDocument, UserDocument
-
 
 def oid(val: str) -> PydanticObjectId:
     return PydanticObjectId(val)
@@ -164,9 +152,6 @@ class ProjectRepository:
         if doc is None or doc.user_id != user_id:
             return None
         return doc
-=======
-=======
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
 from app.infrastructure.persistence.documents import UserDocument
 from app.schemas.user_settings import UserSettings
 
@@ -196,11 +181,7 @@ class UserRepository:
         return doc
 
     async def find_by_email(self, email: str) -> UserDocument | None:
-<<<<<<< HEAD
-        return await UserDocument.find_one({"email": normalize_email(email)})
-=======
         return await UserDocument.find_one(UserDocument.email == normalize_email(email))
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
 
     async def find_by_id(self, user_id: str | PydanticObjectId) -> UserDocument | None:
         return await UserDocument.get(user_id)
@@ -221,7 +202,3 @@ class UserRepository:
         user.settings = UserSettings.model_validate(current)
         await user.save()
         return user
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)

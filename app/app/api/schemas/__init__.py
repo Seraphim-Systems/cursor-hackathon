@@ -1,1 +1,1 @@
-"""Request/response Pydantic models."""
+"""Pydantic schemas for HTTP responses and requests."""

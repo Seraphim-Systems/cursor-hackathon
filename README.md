@@ -2,6 +2,14 @@
 
 Run the full stack with **Docker Compose**. The web UI can stay container-only; for the **Python API** you may optionally use a local **[`app/.venv`](app/README.md)** (see [`app/README.md`](app/README.md)) for tests, debugging, and editor tooling.
 
+## Quick start
+
+1. **Install** [Docker](https://docs.docker.com/get-docker/) with the Compose plugin (`docker compose version`).
+2. **Configure:** `cp .env.example .env` and edit `.env` (set a strong `JWT_SECRET` if the stack is reachable beyond your machine). All keys are listed in [`.env.example`](.env.example); see [Environment variables](#environment-variables) below.
+3. **Run:** `docker compose up --build` from the repo root, then open the URLs in the table below.
+
+Verify the API: `curl -s http://localhost:8000/api/health` should return JSON with `"status": "ok"`.
+
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) with the Compose plugin (`docker compose version`)
@@ -18,20 +26,41 @@ cp .env.example .env
 
 **Deployment:** inject the same variables from your CI/CD **encrypted secrets** (e.g. GitHub Actions); see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+## Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `MONGODB_URI` | MongoDB connection string (Compose default: `mongodb://mongo:27017`) |
+| `MONGODB_DB_NAME` | Database name (default: `journal`) |
+| `JWT_SECRET` | Signing key for access tokens (change for non-local use) |
+| `JWT_ALGORITHM`, `JWT_EXPIRE_MINUTES` | JWT algorithm and token lifetime |
+| `AUDIO_STORAGE_PATH` | Where the API stores uploaded audio inside the container |
+| `CORS_ORIGINS` | Comma-separated browser origins allowed to call the API |
+| `OPENAI_API_KEY` | Optional; required when using OpenAI-backed transcription or analysis |
+| `TRANSCRIPTION_PROVIDER` | `stub`, `openai`, or `http_stt` (if unset in Compose, default is `http_stt` to use the bundled STT service) |
+| `STT_*` | HTTP STT adapter (`STT_BASE_URL`, path, form field, timeout) — see [`.env.example`](.env.example) |
+| `AI_ANALYSIS_PROVIDER` | `stub` or provider that uses `AI_OPENAI_*` when configured |
+| `AI_OPENAI_BASE_URL`, `AI_OPENAI_MODEL`, `AI_HTTP_TIMEOUT_SECONDS` | OpenAI-compatible analysis endpoint and model |
+| `VITE_API_URL` | API base URL baked into the **web** image at build time (browser calls this host) |
+
+Full defaults and comments: [`.env.example`](.env.example).
+
 ## Production-like stack (nginx + API)
 
-Build and start MongoDB, API (`app` service), and static web UI (`web` service):
+Build and start MongoDB, speech-to-text (`stt`), API (`app`), and static web UI (`web`):
 
 ```bash
 docker compose up --build
 ```
 
-| Service | URL |
+| Service | URL / port |
 |--------|-----|
 | Web UI | http://localhost |
 | API | http://localhost:8000 |
 | OpenAPI | http://localhost:8000/api/docs |
+| Health | http://localhost:8000/api/health |
 | MongoDB | `localhost:27017` (optional host access) |
+| STT (Whisper ASR, optional for host debugging) | http://localhost:9000 |
 
 Stop: `docker compose down` (add `-v` to drop named volumes).
 
@@ -47,6 +76,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 |--------|-----|
 | Web UI | http://localhost:5173 |
 | API | http://localhost:8000 |
+| OpenAPI | http://localhost:8000/api/docs |
+| Health | http://localhost:8000/api/health |
 
 The Python package is mounted from [`app/app/`](app/app/); the web app from [`web/`](web/). The `web` service uses a container-only `node_modules` volume — **do not run `npm install` or `npm` on the host**; use Compose (or `docker compose build web` for a production bundle check).
 

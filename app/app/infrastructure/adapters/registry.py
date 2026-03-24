@@ -2,14 +2,17 @@
 
 import json
 
-import json
-
 import httpx
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
 
 from app.config import Settings
-from app.domain.protocols import AnalysisResult, IAIAnalyzer, ITranscriber, TranscriptionResult
+from app.domain.protocols import AnalysisResult, IAIAnalyzer, ITranscriber, TranscriptionResult, IAudioStorage
 
+from app.infrastructure.adapters.local_audio_storage import LocalAudioStorage
+from app.infrastructure.adapters.http_stt_transcriber import HttpSttTranscriber
+from app.infrastructure.adapters.openai_compat_analyzer import OpenAiCompatAnalyzer
+from app.infrastructure.adapters.openai_compat_transcriber import OpenAiCompatTranscriber
+from app.infrastructure.adapters.stub_analyzer import StubAnalyzer
+from app.infrastructure.adapters.stub_transcriber import StubTranscriber
 
 class StubTranscriber(ITranscriber):
     async def transcribe(self, *, audio_bytes: bytes, mime_type: str | None) -> TranscriptionResult:
@@ -19,6 +22,7 @@ class StubTranscriber(ITranscriber):
 class HttpSttTranscriber(ITranscriber):
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
+
 
     async def transcribe(self, *, audio_bytes: bytes, mime_type: str | None) -> TranscriptionResult:
         base = self._settings.stt_base_url.rstrip("/")
@@ -64,6 +68,10 @@ class StubAnalyzer(IAIAnalyzer):
         )
 
 
+def build_audio_storage(settings: Settings) -> IAudioStorage:
+    return LocalAudioStorage(settings.audio_storage_path)
+
+
 def build_transcriber(settings: Settings) -> ITranscriber:
     if settings.transcription_provider == "http_stt":
         return HttpSttTranscriber(
@@ -72,7 +80,6 @@ def build_transcriber(settings: Settings) -> ITranscriber:
             form_field=settings.stt_form_field,
             timeout_seconds=settings.stt_timeout_seconds,
         )
-=======
 
 class StubTranscriber(ITranscriber):
     async def transcribe(self, *, audio_bytes: bytes, mime_type: str | None) -> TranscriptionResult:
@@ -130,12 +137,22 @@ class StubAnalyzer(IAIAnalyzer):
 def build_transcriber(settings: Settings) -> ITranscriber:
     if settings.transcription_provider == "http_stt":
         return HttpSttTranscriber(settings)
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
+    if provider in ("openai", "openai_compat", "openai-compatible"):
+        key = (settings.openai_api_key or "").strip()
+        if not key:
+            logger.warning("TRANSCRIPTION_PROVIDER=openai but OPENAI_API_KEY empty; using stub")
+            return StubTranscriber()
+        return OpenAiCompatTranscriber(
+            api_key=key,
+            base_url=settings.ai_openai_base_url,
+            model=settings.transcription_openai_model,
+            timeout_seconds=settings.stt_timeout_seconds,
+        )
+    logger.warning("Unknown TRANSCRIPTION_PROVIDER=%r; using stub", settings.transcription_provider)
     return StubTranscriber()
 
 
 def build_analyzer(settings: Settings) -> IAIAnalyzer:
-<<<<<<< HEAD
     if settings.ai_analysis_provider == "openai" and settings.openai_api_key:
         return OpenAiCompatAnalyzer(
             api_key=settings.openai_api_key,
@@ -143,7 +160,4 @@ def build_analyzer(settings: Settings) -> IAIAnalyzer:
             model=settings.ai_openai_model,
             timeout_seconds=settings.ai_http_timeout_seconds,
         )
-=======
-    _ = settings
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
     return StubAnalyzer()

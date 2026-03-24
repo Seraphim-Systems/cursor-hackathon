@@ -1,11 +1,16 @@
 """MongoDB client and Beanie initialization."""
 
+from __future__ import annotations
 from beanie import init_beanie as beanie_init
 from motor.motor_asyncio import AsyncIOMotorClient
+
+from app.infrastructure.persistence.documents import JournalEntryDocument, UserDocument
+from app.infrastructure.persistence.project_document import ProjectDocument
 
 from app.config import settings
 from app.infrastructure.persistence.documents import UserDocument
 
+DOCUMENT_MODELS = [UserDocument, JournalEntryDocument, ProjectDocument]
 
 async def init_beanie(
     client: AsyncIOMotorClient,

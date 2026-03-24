@@ -1,58 +1,195 @@
-import { clearStoredToken, getStoredToken } from "./token";
+import type { UserSettings } from "../types/userSettings";
+import type { CalendarResponse, EntryListResponse, JournalEntry, TokenResponse } from "./types";
 
-const apiBase = import.meta.env.VITE_API_URL ?? "";
+export type { CalendarResponse, EntryListResponse, JournalEntry, TokenResponse } from "./types";
 
-/** Browser URL for API paths (e.g. `/api/...`). Empty `VITE_API_URL` uses same-origin + Vite dev proxy. */
+const TOKEN_KEY = "journal_access_token";
+
 export function apiUrl(path: string): string {
-  if (!path.startsWith("/")) {
-    throw new Error(`api path must start with /, got: ${path}`);
-  }
-  return `${apiBase}${path}`;
+  const base = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+  if (base) return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  return path.startsWith("/") ? path : `/${path}`;
 }
 
-function parseErrorDetail(body: unknown): string {
-  if (body && typeof body === "object" && "detail" in body) {
-    const d = (body as { detail: unknown }).detail;
-    if (typeof d === "string") return d;
-    if (Array.isArray(d)) {
-      return d.map((x) => (typeof x === "object" && x && "msg" in x ? String((x as { msg: unknown }).msg) : String(x))).join(", ");
-    }
+/** Empty string means same-origin (Vite dev proxy to `/api`). */
+export function getApiBase(): string {
+  return (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+}
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public body?: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+async function parseError(res: Response): Promise<string> {
+  const text = await res.text();
+  try {
+    const j = JSON.parse(text) as { detail?: unknown };
+    if (typeof j.detail === "string") return j.detail;
+    if (j.detail !== undefined) return JSON.stringify(j.detail);
+  } catch {
+    /* ignore */
+  }
+  return text || res.statusText;
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
+  const headers = new Headers(init?.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const body = init?.body;
+  if (body !== undefined && !(body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  const res = await fetch(apiUrl(path), { ...init, headers });
+  if (res.status === 401) {
+    clearToken();
+    throw new ApiError("Unauthorized", 401);
+  }
+  if (!res.ok) {
+    const text = await parseError(res);
+    throw new ApiError(text, res.status, text);
+  }
+  if (res.status === 204) return undefined as T;
+  return res.json() as Promise<T>;
+}
+
+export async function login(email: string, password: string): Promise<TokenResponse> {
+  return apiFetch<TokenResponse>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function listEntries(limit = 50, offset = 0): Promise<EntryListResponse> {
+  const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return apiFetch<EntryListResponse>(`/api/entries?${q.toString()}`);
+}
+
+export async function getEntry(id: string): Promise<JournalEntry> {
+  return apiFetch<JournalEntry>(`/api/entries/${encodeURIComponent(id)}`);
+}
+
+function parseDetailString(text: string): string {
+  try {
+    const j = JSON.parse(text) as { detail?: unknown };
+    if (typeof j.detail === "string") return j.detail;
+    if (j.detail !== undefined) return JSON.stringify(j.detail);
+  } catch {
+    if (text.trim()) return text;
   }
   return "Request failed";
 }
 
-/** JSON `fetch` with `Authorization: Bearer` when a token is stored. */
-export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const headers = new Headers(init.headers);
-  const token = getStoredToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+/**
+ * Multipart POST /api/entries with upload progress (XHR — `fetch` has no upload progress events).
+ * Form fields must match the API: `audio` file, optional `text`, `run_analysis`.
+ */
+export function createEntryWithAudioProgress(
+  formData: FormData,
+  onProgress: (loaded: number, total: number) => void,
+): Promise<JournalEntry> {
+  const token = getToken();
+  if (!token) {
+    return Promise.reject(new ApiError("Unauthorized", 401));
   }
-  if (init.body !== undefined && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-  const res = await fetch(apiUrl(path), { ...init, headers });
-  // Drop session only when an authenticated request is rejected (not e.g. wrong password on login).
-  if (res.status === 401 && token) {
-    clearStoredToken();
-  }
-  return res;
+  const url = apiUrl("/api/entries");
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable) onProgress(ev.loaded, ev.total);
+    };
+    xhr.onload = () => {
+      const text = xhr.responseText;
+      if (xhr.status === 401) {
+        clearToken();
+        reject(new ApiError("Unauthorized", 401));
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(text) as JournalEntry);
+        } catch {
+          reject(new ApiError("Invalid JSON from server", xhr.status, text));
+        }
+        return;
+      }
+      reject(new ApiError(parseDetailString(text), xhr.status, text));
+    };
+    xhr.onerror = () => reject(new ApiError("Network error", 0));
+    xhr.send(formData);
+  });
 }
 
-/** Parse JSON response; on error status, throw with message from FastAPI `detail` when present. */
-export async function apiJson<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await apiFetch(path, init);
-  const text = await res.text();
-  let data: unknown = undefined;
-  if (text) {
-    try {
-      data = JSON.parse(text) as unknown;
-    } catch {
-      throw new Error(res.ok ? "Invalid JSON response" : text || `HTTP ${res.status}`);
-    }
-  }
-  if (!res.ok) {
-    throw new Error(parseErrorDetail(data));
-  }
-  return data as T;
+export interface PatchEntryBody {
+  cleaned_text?: string | null;
+  transcript?: string | null;
+  summary?: string | null;
+  sentiment_score?: number | null;
+  insights?: InsightsPayload;
+  insights_field_locks?: string[];
+}
+
+export interface InsightsPayload {
+  key_points: string[];
+  projects: { name: string; notes: string }[];
+  goals: string[];
+  blockers: string[];
+  people: string[];
+  priorities: string[];
+  themes: string[];
+}
+
+export async function patchEntry(id: string, body: PatchEntryBody): Promise<JournalEntry> {
+  return apiFetch<JournalEntry>(`/api/entries/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function analyzeEntry(
+  id: string,
+  preserveLockedFields = true,
+): Promise<JournalEntry> {
+  return apiFetch<JournalEntry>(`/api/entries/${encodeURIComponent(id)}/analyze`, {
+    method: "POST",
+    body: JSON.stringify({ preserve_locked_fields: preserveLockedFields }),
+  });
+}
+
+export async function getCalendar(from: string, to: string): Promise<CalendarResponse> {
+  const q = new URLSearchParams({ from, to });
+  return apiFetch<CalendarResponse>(`/api/calendar?${q.toString()}`);
+}
+
+/** GET/PATCH /api/settings — contracts/user-settings.schema.json */
+export async function getSettings(): Promise<UserSettings> {
+  return apiFetch<UserSettings>("/api/settings");
+}
+
+export async function patchSettings(patch: Partial<UserSettings>): Promise<UserSettings> {
+  return apiFetch<UserSettings>("/api/settings", {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
 }

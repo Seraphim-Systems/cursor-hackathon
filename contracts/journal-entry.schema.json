@@ -19,7 +19,7 @@
     "insights_field_locks": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Keys or dot-paths excluded from AI overwrite on re-analyze"
+      "description": "Paths excluded from AI overwrite when POST /api/entries/{id}/analyze runs with preserve_locked_fields true: top-level summary, sentiment_score; whole insights object via insights; per-field via insights.key_points, insights.projects, insights.goals, insights.blockers, insights.people, insights.priorities, insights.themes. On PATCH /api/entries/{id}, partial insights updates skip locked paths; remove a path from this list in the same request (or earlier) to edit that field again."
     }
   },
   "additionalProperties": true

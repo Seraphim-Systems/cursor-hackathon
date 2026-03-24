@@ -29,3 +29,26 @@ def test_apply_respects_field_locks() -> None:
     assert entry.insights.goals == ["g"]
     assert len(entry.insights.projects) == 1
     assert entry.insights.themes == ["t"]
+
+
+def test_insights_root_lock_preserves_entire_insights_block() -> None:
+    entry = JournalEntryDocument.model_construct(
+        user_id="u1",
+        source="text",
+        insights=InsightsEmbedded(key_points=["keep"]),
+        insights_field_locks=["insights"],
+    )
+    result = AnalysisResult(
+        summary="new sum",
+        sentiment_score=0.1,
+        key_points=["would overwrite"],
+        projects=[{"name": "P", "notes": ""}],
+        goals=["g"],
+        blockers=[],
+        people=[],
+        priorities=[],
+        themes=["t"],
+    )
+    apply_analysis_to_entry(entry, result, preserve_locked_fields=True)
+    assert entry.summary == "new sum"
+    assert entry.insights.key_points == ["keep"]

@@ -23,6 +23,7 @@ JSON Schema files describe portable data shapes shared by the API (`app/`), the 
 | [`insights.schema.json`](insights.schema.json) | AI-extracted structured insights (embedded on entry) |
 | [`analyze-request.schema.json`](analyze-request.schema.json) | `POST /api/entries/{id}/analyze` body |
 | [`ai-analysis-payload.schema.json`](ai-analysis-payload.schema.json) | Validated LLM JSON before mapping to entry fields |
+| [`project.schema.json`](project.schema.json) | `Project` resource (`GET/PATCH /api/projects`) |
 | [`project-resource.schema.json`](project-resource.schema.json) | Single project resource |
 | [`project-patch.schema.json`](project-patch.schema.json) | `PATCH /api/projects/{id}` body |
 | [`project-list.schema.json`](project-list.schema.json) | `GET /api/projects` |

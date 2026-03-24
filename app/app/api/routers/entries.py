@@ -1,160 +1,320 @@
+"""Journal entry routes — CRUD (P2.1) + analyze (P2.4+)."""
+
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+from typing import Annotated, Literal
 
-from app.api.deps import JournalFacadeDep, UserDep
-from app.api.schemas.entries import JournalEntryResponse, entry_to_response
-from app.infrastructure.persistence.repositories import JournalEntryRepository
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.api.deps import UserDep, get_analyzer, get_audio_storage, get_transcriber
+from app.api.schemas.entries import (
+    JournalEntryCreateBody,
+    JournalEntryListResponse,
+    JournalEntryOut,
+    JournalEntryPatchBody,
+    journal_entry_to_out,
+)
+from app.application.facades.audio_upload_pipeline import save_audio_and_transcribe
+from app.application.facades.entries_analyze import reanalyze_journal_entry
+from app.domain.entry_insight_merge import apply_journal_entry_insight_patch
+from app.domain.protocols import IAIAnalyzer, IAudioStorage, ITranscriber
+from app.infrastructure.persistence.documents import InsightsEmbedded
+from app.infrastructure.persistence.journal_entry_repository import (
+    JournalEntryRepository,
+    get_journal_entry_repository,
+)
 
 router = APIRouter(prefix="/entries", tags=["entries"])
 
-
-class AnalyzeBody(BaseModel):
-    preserve_locked_fields: bool = True
-
-
-class EntryPatchBody(BaseModel):
-    cleaned_text: str | None = None
-    transcript: str | None = None
-    summary: str | None = None
-    sentiment_score: float | None = Field(None, ge=-1, le=1)
-    insights: dict | None = None
-    insights_field_locks: list[str] | None = None
+_INSIGHT_PATCH_KEYS = frozenset(
+    {"summary", "sentiment_score", "insights", "insights_field_locks"},
+)
 
 
-class EntryListOut(BaseModel):
-    items: list[JournalEntryResponse]
-    total: int | None = None
+class AnalyzeEntryBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    preserve_locked_fields: bool = Field(
+        default=True,
+        description="When true, do not overwrite fields listed in insights_field_locks.",
+    )
 
 
-@router.post("", response_model=JournalEntryResponse, status_code=status.HTTP_201_CREATED)
-async def create_entry(
-    user: UserDep,
-    facade: JournalFacadeDep,
-    text: str | None = Form(None),
-    audio: UploadFile | None = File(None),
-    run_analysis: bool = Form(True),
-) -> JournalEntryResponse:
-    audio_bytes: bytes | None = None
-    audio_filename: str | None = None
-    audio_ct: str | None = None
-    if audio is not None:
-        audio_bytes = await audio.read()
-        audio_filename = audio.filename
-        audio_ct = audio.content_type
-
-    try:
-        entry = await facade.create_entry(
-            user_id=str(user.id),
-            text=text,
-            audio_bytes=audio_bytes,
-            audio_filename=audio_filename,
-            audio_content_type=audio_ct,
-            run_analysis=run_analysis,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    return entry_to_response(entry)
+def _repo_dep() -> JournalEntryRepository:
+    return get_journal_entry_repository()
 
 
-@router.get("", response_model=EntryListOut)
+@router.get("", response_model=JournalEntryListResponse)
 async def list_entries(
     user: UserDep,
-    limit: int = 50,
-    offset: int = 0,
-) -> EntryListOut:
-    repo = JournalEntryRepository()
-    items = await repo.list_for_user(str(user.id), skip=offset, limit=min(limit, 100))
-    total = await repo.count_for_user(str(user.id))
-    return EntryListOut(
-        items=[entry_to_response(e) for e in items],
+    repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    created_from: datetime | None = Query(default=None, alias="from"),
+    created_to: datetime | None = Query(default=None, alias="to"),
+) -> JournalEntryListResponse:
+    user_id = str(user.id)
+    items, total = await repo.list_for_user(
+        user_id=user_id,
+        limit=limit,
+        skip=offset,
+        created_from=created_from,
+        created_to=created_to,
+    )
+    return JournalEntryListResponse(
+        items=[journal_entry_to_out(e) for e in items],
         total=total,
     )
 
 
-@router.get("/{entry_id}", response_model=JournalEntryResponse)
-async def get_entry(entry_id: str, user: UserDep) -> JournalEntryResponse:
-    repo = JournalEntryRepository()
-    doc = await repo.get_for_user(entry_id, str(user.id))
-    if doc is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
-    return entry_to_response(doc)
-
-
-@router.patch("/{entry_id}", response_model=JournalEntryResponse)
-async def patch_entry(
-    entry_id: str,
-    body: EntryPatchBody,
+@router.post("", response_model=JournalEntryOut, status_code=status.HTTP_201_CREATED)
+async def create_entry(
+    request: Request,
     user: UserDep,
-    facade: JournalFacadeDep,
-) -> JournalEntryResponse:
-    try:
-        doc = await facade.patch_entry(
-            user_id=str(user.id),
-            entry_id=entry_id,
-            cleaned_text=body.cleaned_text,
+    repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
+    storage: Annotated[IAudioStorage, Depends(get_audio_storage)],
+    transcriber: Annotated[ITranscriber, Depends(get_transcriber)],
+) -> JournalEntryOut:
+    """Create an entry from JSON or multipart (optional `audio` part per DATA_CONTRACTS §Entries)."""
+    user_id = str(user.id)
+    content_type = (request.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+
+    if content_type == "application/json":
+        body = JournalEntryCreateBody.model_validate(await request.json())
+        insights_dict = body.insights.model_dump() if body.insights is not None else None
+        doc = await repo.create(
+            user_id=user_id,
+            source=body.source,
+            audio_storage_key=body.audio_storage_key,
             transcript=body.transcript,
+            cleaned_text=body.cleaned_text,
             summary=body.summary,
             sentiment_score=body.sentiment_score,
-            insights=body.insights,
+            insights=insights_dict,
             insights_field_locks=body.insights_field_locks,
         )
-    except LookupError:
+        return journal_entry_to_out(doc)
+
+    if content_type == "multipart/form-data":
+        form = await request.form()
+        meta_raw = form.get("metadata")
+        if isinstance(meta_raw, str) and meta_raw.strip():
+            body = JournalEntryCreateBody.model_validate_json(meta_raw)
+        else:
+            raw_source = form.get("source")
+            src: Literal["text", "audio", "mixed"] = "text"
+            if isinstance(raw_source, str) and raw_source in ("text", "audio", "mixed"):
+                src = raw_source  # type: ignore[assignment]
+            ct_val = form.get("cleaned_text")
+            cleaned = (
+                str(ct_val).strip()
+                if ct_val is not None and isinstance(ct_val, str) and str(ct_val).strip()
+                else None
+            )
+            body = JournalEntryCreateBody(
+                source=src,
+                cleaned_text=cleaned,
+                audio_storage_key=None,
+                transcript=None,
+                summary=None,
+                sentiment_score=None,
+                insights=None,
+                insights_field_locks=None,
+            )
+
+        up = form.get("audio")
+        audio_bytes = b""
+        filename_hint = "audio"
+        if up is not None and hasattr(up, "read"):
+            audio_bytes = await up.read()
+            filename_hint = getattr(up, "filename", None) or filename_hint
+
+        has_audio = len(audio_bytes) > 0
+        has_text = bool(body.cleaned_text and body.cleaned_text.strip())
+        resolved_source: Literal["text", "audio", "mixed"]
+        if has_audio and has_text:
+            resolved_source = "mixed"
+        elif has_audio:
+            resolved_source = "audio"
+        else:
+            resolved_source = body.source
+
+        audio_key = body.audio_storage_key
+        transcript_val = body.transcript
+        if has_audio:
+            mime_type = getattr(up, "content_type", None) if up is not None else None
+            try:
+                audio_key, t_result = await save_audio_and_transcribe(
+                    audio_storage=storage,
+                    transcriber=transcriber,
+                    user_id=user_id,
+                    filename_hint=str(filename_hint),
+                    data=audio_bytes,
+                    mime_type=mime_type,
+                )
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(e),
+                ) from e
+            transcript_val = t_result.text
+
+        insights_dict = body.insights.model_dump() if body.insights is not None else None
+        doc = await repo.create(
+            user_id=user_id,
+            source=resolved_source,
+            audio_storage_key=audio_key,
+            transcript=transcript_val,
+            cleaned_text=body.cleaned_text,
+            summary=body.summary,
+            sentiment_score=body.sentiment_score,
+            insights=insights_dict,
+            insights_field_locks=body.insights_field_locks,
+        )
+        return journal_entry_to_out(doc)
+
+    raise HTTPException(
+        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+        detail="Content-Type must be application/json or multipart/form-data",
+    )
+
+
+@router.get("/{entry_id}", response_model=JournalEntryOut)
+async def get_entry(
+    entry_id: str,
+    user: UserDep,
+    repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
+) -> JournalEntryOut:
+    doc = await repo.get_owned(entry_id, str(user.id))
+    if doc is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    return entry_to_response(doc)
+    return journal_entry_to_out(doc)
+
+
+@router.patch("/{entry_id}", response_model=JournalEntryOut)
+async def patch_entry(
+    entry_id: str,
+    body: JournalEntryPatchBody,
+    user: UserDep,
+    repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
+) -> JournalEntryOut:
+    user_id = str(user.id)
+    entry = await repo.get_owned(entry_id, user_id)
+    if entry is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+
+    patch_data = body.model_dump(exclude_unset=True)
+    insight_patch = {k: patch_data[k] for k in _INSIGHT_PATCH_KEYS if k in patch_data}
+    if "insights" in insight_patch and insight_patch["insights"] is not None:
+        ins_val = insight_patch["insights"]
+        if hasattr(ins_val, "model_dump"):
+            insight_patch["insights"] = ins_val.model_dump(mode="json")
+
+    if insight_patch:
+        current = {
+            "summary": entry.summary,
+            "sentiment_score": entry.sentiment_score,
+            "insights": entry.insights.model_dump(mode="json"),
+            "insights_field_locks": list(entry.insights_field_locks),
+        }
+        updated = apply_journal_entry_insight_patch(current, insight_patch)
+        entry.summary = updated["summary"]
+        entry.sentiment_score = updated["sentiment_score"]
+        raw_ins = updated.get("insights")
+        if raw_ins is None:
+            entry.insights = InsightsEmbedded()
+        else:
+            entry.insights = InsightsEmbedded.model_validate(raw_ins)
+        entry.insights_field_locks = list(updated.get("insights_field_locks") or [])
+
+    for key, value in patch_data.items():
+        if key in _INSIGHT_PATCH_KEYS:
+            continue
+        setattr(entry, key, value)
+
+    entry.updated_at = datetime.now(timezone.utc)
+    await entry.save()
+    return journal_entry_to_out(entry)
 
 
 @router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_entry(entry_id: str, user: UserDep, facade: JournalFacadeDep) -> None:
-    ok = await facade.delete_entry(user_id=str(user.id), entry_id=entry_id)
-    if not ok:
+async def delete_entry(
+    entry_id: str,
+    user: UserDep,
+    repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
+) -> None:
+    deleted = await repo.delete_owned(entry_id, str(user.id))
+    if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
 
 
-@router.post("/{entry_id}/audio", response_model=JournalEntryResponse)
+@router.post("/{entry_id}/analyze")
+async def analyze_entry(
+    entry_id: str,
+    body: AnalyzeEntryBody,
+    user: UserDep,
+    analyzer: Annotated[IAIAnalyzer, Depends(get_analyzer)],
+    repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
+) -> dict:
+    """Re-run structured analysis; locked paths keep prior values (see DATA_CONTRACTS §Insights)."""
+    entry = await repo.get_owned(entry_id, str(user.id))
+    if entry is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+    updated = await reanalyze_journal_entry(
+        entry=entry,
+        preserve_locked_fields=body.preserve_locked_fields,
+        analyzer=analyzer,
+    )
+    return journal_entry_to_out(updated).model_dump(mode="json")
+
+
+@router.post("/{entry_id}/upload-audio", response_model=JournalEntryOut)
 async def upload_entry_audio(
     entry_id: str,
     user: UserDep,
-    facade: JournalFacadeDep,
-    audio: UploadFile = File(...),
-    run_analysis: bool = Form(True),
-) -> JournalEntryResponse:
-    audio_bytes = await audio.read()
-    try:
-        doc = await facade.attach_audio_and_process(
-            user_id=str(user.id),
-            entry_id=entry_id,
-            audio_bytes=audio_bytes,
-            audio_filename=audio.filename,
-            audio_content_type=audio.content_type,
-            run_analysis=run_analysis,
-        )
-    except LookupError:
+    repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
+    audio_storage: Annotated[IAudioStorage, Depends(get_audio_storage)],
+    transcriber: Annotated[ITranscriber, Depends(get_transcriber)],
+    audio: UploadFile = File(..., description="Raw audio (webm, wav, mp3, etc.)"),
+) -> JournalEntryOut:
+    """Save audio under `AUDIO_STORAGE_PATH`, run `ITranscriber`, persist `audio_storage_key` + `transcript`."""
+    user_id = str(user.id)
+    entry = await repo.get_owned(entry_id, user_id)
+    if entry is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    return entry_to_response(doc)
 
-
-@router.post("/{entry_id}/analyze", response_model=JournalEntryResponse)
-async def analyze_entry(
-    entry_id: str,
-    user: UserDep,
-    facade: JournalFacadeDep,
-    body: AnalyzeBody | None = None,
-) -> JournalEntryResponse:
-    preserve = True if body is None else body.preserve_locked_fields
-    try:
-        doc = await facade.reanalyze_entry(
-            user_id=str(user.id),
-            entry_id=entry_id,
-            preserve_locked_fields=preserve,
+    data = await audio.read()
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Empty audio file",
         )
-    except LookupError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+
+    hint = audio.filename or "upload.bin"
+    mime = audio.content_type
+    try:
+        storage_key, t_result = await save_audio_and_transcribe(
+            audio_storage=audio_storage,
+            transcriber=transcriber,
+            user_id=user_id,
+            filename_hint=hint,
+            data=data,
+            mime_type=mime,
+        )
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    return entry_to_response(doc)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+
+    entry.audio_storage_key = storage_key
+    entry.transcript = t_result.text
+    if entry.cleaned_text and entry.cleaned_text.strip():
+        entry.source = "mixed"
+    else:
+        entry.source = "audio"
+    entry.updated_at = datetime.now(timezone.utc)
+    await entry.save()
+    return journal_entry_to_out(entry)

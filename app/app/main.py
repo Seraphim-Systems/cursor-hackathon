@@ -2,31 +2,25 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-<<<<<<< HEAD
-<<<<<<< Updated upstream
 from contextlib import asynccontextmanager
 from typing import Any
 
 from beanie import init_beanie
-=======
 import asyncio
 import logging
 from contextlib import asynccontextmanager
 
->>>>>>> Stashed changes
-=======
 import asyncio
 import logging
 from contextlib import asynccontextmanager
 
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
 from fastapi import FastAPI, Request, Request
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from motor.motor_asyncio import AsyncIOMotorClient
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 
-<<<<<<< HEAD
-<<<<<<< Updated upstream
 from app.api.routers import auth, calendar, entries, projects, settings as settings_router
 from app.config import settings
 from app.infrastructure.adapters import build_analyzer, build_transcriber
@@ -37,15 +31,12 @@ from app.infrastructure.persistence.documents import (
 )
 
 # Routers register on /api/*
-=======
 from app.api.routers import auth, settings as settings_router
 from app.config import settings
 from app.infrastructure.adapters import build_analyzer, build_transcriber
 from app.infrastructure.persistence.database import init_beanie
 
 logger = logging.getLogger(__name__)
->>>>>>> Stashed changes
-=======
 from app.api.routers import auth, settings as settings_router
 from app.api.routers import auth, settings as settings_router
 from app.config import settings
@@ -72,22 +63,17 @@ async def lifespan(app: FastAPI):
 from app.infrastructure.persistence.database import init_beanie
 
 logger = logging.getLogger(__name__)
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
+from app.infrastructure.persistence.beanie_app import init_beanie_for_app, mongo_ping_ok
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     client = AsyncIOMotorClient(settings.mongodb_uri)
-<<<<<<< HEAD
-<<<<<<< Updated upstream
     await init_beanie(
         database=client[settings.mongodb_db_name],
         document_models=[UserDocument, JournalEntryDocument, ProjectDocument],
     )
     app.state.mongo = client
-=======
-=======
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
     app.state.mongo_client = client
     try:
         await client.admin.command("ping")
@@ -95,11 +81,9 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception(
             "MongoDB ping or Beanie init failed; /api/health will report database disconnected"
-        )
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> 804c3f6 (Implement user authentication and settings management with FastAPI)
+
+    client = await init_beanie_for_app()
+    app.state.mongo_client = client
     yield
     client.close()
 
@@ -125,33 +109,11 @@ app.include_router(settings_router.router, prefix="/api")
 
 app.include_router(auth.router, prefix="/api")
 app.include_router(settings_router.router, prefix="/api")
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-app.include_router(entries.router, prefix="/api")
-app.include_router(projects.router, prefix="/api")
-app.include_router(calendar.router, prefix="/api")
-
-
-@app.get("/api/health")
-async def health(request: Request) -> dict[str, Any]:
-    """Liveness, database ping, active adapters (see data contracts §Health)."""
-    db_status = "disconnected"
-    client: AsyncIOMotorClient | None = getattr(request.app.state, "mongo", None)
-    if client is not None:
-        try:
-            await client.admin.command("ping")
-            db_status = "connected"
-        except Exception:
-            db_status = "disconnected"
-
-=======
 
 
 @app.get("/api/health")
 async def health(request: Request) -> dict:
     """Liveness; DB connectivity + active transcription / analysis adapters."""
->>>>>>> Stashed changes
-=======
 
 
 @app.get("/api/health")
@@ -175,9 +137,15 @@ async def health(request: Request) -> dict:
             db_status = "connected"
         except Exception:
             db_status = "disconnected"
+    transcriber = build_transcriber(settings)
+    analyzer = build_analyzer(settings)
+    database = "disconnected"
+    client = getattr(request.app.state, "mongo_client", None)
+    if client is not None and await mongo_ping_ok(client):
+        database = "connected"
     return {
         "status": "ok",
-        "database": db_status,
+        "database": database,
         "transcription_adapter": transcriber.__class__.__name__,
         "analysis_adapter": analyzer.__class__.__name__,
     }
