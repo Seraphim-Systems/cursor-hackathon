@@ -153,12 +153,12 @@ export default function GraphPage() {
   }
 
   // Filter entries with sentiment score
-  const trendData = entries.filter(e => e.sentiment_score !== null);
+  const trendData = entries.filter((e) => e.sentiment_score !== null);
   
   // Aggregate themes
   const themeCounts: Record<string, number> = {};
-  entries.forEach(e => {
-    (e.insights?.themes ?? []).forEach(t => {
+  entries.forEach((e) => {
+    (e.insights?.themes ?? []).forEach((t) => {
       themeCounts[t] = (themeCounts[t] || 0) + 1;
     });
   });
@@ -456,8 +456,7 @@ export default function GraphPage() {
                       const totalWidth = Math.max(100, trendData.length * 50);
                       const x = trendData.length > 1 ? (i / (trendData.length - 1)) * totalWidth : totalWidth / 2;
                       const y = 220 - (e.sentiment_score! * 180);
-                      
-                      const factors = e.insights?.impactful_factors || [];
+                      const factors = e.insights?.impactful_factors ?? [];
                       
                       return (
                         <g key={e.id}>
@@ -502,7 +501,6 @@ export default function GraphPage() {
                               </g>
                             );
                           })}
-
                           {/* Date Label on X-Axis */}
                           <text 
                             x={x} y="430" 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getCalendar, getEntry, getPeriodSummary } from "../api/client";
-import type { CalendarDay, PeriodSummary } from "../api/types";
+import type { CalendarDay, JournalEntry, PeriodSummary } from "../api/types";
 import { DuckMicButton, DuckRecordButton } from "../components/DuckRecordButton";
 import { useAuth } from "../auth/AuthContext";
 import { useJournalRecording } from "../hooks/useJournalRecording";
@@ -21,46 +21,8 @@ const MONTHS = [
   "December",
 ] as const;
 
-function oneLinePreview(text: string, max = 84): string {
-  const clean = (text || "").replace(/\s+/g, " ").trim();
-  if (!clean) return "No entries yet.";
-  if (clean.length <= max) return clean;
-  // Avoid appending "…" — we rely on CSS clamping/ellipsis for a cleaner look.
-  return clean.slice(0, max).trimEnd();
-}
-
 function isoDateYmd(d: Date): string {
   return d.toISOString().slice(0, 10);
-}
-
-function monthRange(year: number, month1to12: number): { from: string; to: string } {
-  const from = new Date(Date.UTC(year, month1to12 - 1, 1));
-  const to = new Date(Date.UTC(year, month1to12, 0)); // last day of month
-  return { from: isoDateYmd(from), to: isoDateYmd(to) };
-}
-
-function parseYmd(ymd: string): Date {
-  const [y, m, d] = ymd.split("-").map((x) => Number(x));
-  return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
-}
-
-function fmtMonthDay(d: Date): string {
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
-}
-
-function weekStartMonday(ymd: string): string {
-  const d = parseYmd(ymd);
-  // JS: 0=Sun..6=Sat. Convert to Monday start.
-  const dow = d.getUTCDay();
-  const delta = (dow + 6) % 7; // Mon=0, Sun=6
-  d.setUTCDate(d.getUTCDate() - delta);
-  return isoDateYmd(d);
-}
-
-function addDays(ymd: string, n: number): string {
-  const d = parseYmd(ymd);
-  d.setUTCDate(d.getUTCDate() + n);
-  return isoDateYmd(d);
 }
 
 function monthStartYmd(year: number, month1to12: number): string {
