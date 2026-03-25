@@ -54,3 +54,19 @@ class LocalAudioStorage(IAudioStorage):
                 full.unlink()
 
         await asyncio.to_thread(_unlink)
+
+    async def read_bytes(self, storage_key: str) -> bytes | None:
+        if not storage_key or ".." in storage_key:
+            return None
+        full = (self._root / storage_key).resolve()
+        try:
+            full.relative_to(self._root)
+        except ValueError:
+            return None
+
+        def _read() -> bytes | None:
+            if not full.is_file():
+                return None
+            return full.read_bytes()
+
+        return await asyncio.to_thread(_read)

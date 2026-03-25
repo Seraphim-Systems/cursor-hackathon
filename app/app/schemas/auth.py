@@ -18,6 +18,7 @@ class LoginRequest(BaseModel):
 class UserPublic(BaseModel):
     id: str
     email: str
+    is_admin: bool = False
 
 
 class TokenResponse(BaseModel):

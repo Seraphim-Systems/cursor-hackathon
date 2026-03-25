@@ -1,131 +1,55 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
+import { ApiError, getEntry } from "../api/client";
+import type { JournalEntry } from "../api/types";
+import { EntryAudioPlayer } from "../components/EntryAudioPlayer";
 import {
-  ApiError,
-  analyzeEntry,
-  getEntry,
-  patchEntry,
-  type InsightsPayload,
-  type PatchEntryBody,
-} from "../api/client";
-import type { Insights, JournalEntry, ProjectInsightItem } from "../api/types";
+  entryBackLinkLabel,
+  safeEntryBackPath,
+  type EntryDetailNavState,
+} from "../utils/entryNavigation";
+import { emotionMarkerPercent, emotionRatingFromSentiment } from "../utils/emotionRating";
 
-/** Paths accepted by server re-analyze (`insight_apply` + tests). */
-const LOCK_OPTIONS: { path: string; label: string }[] = [
-  { path: "summary", label: "Summary" },
-  { path: "sentiment_score", label: "Sentiment score" },
-  { path: "insights", label: "Entire insights object" },
-  { path: "insights.key_points", label: "Key points" },
-  { path: "insights.projects", label: "Projects" },
-  { path: "insights.goals", label: "Goals" },
-  { path: "insights.blockers", label: "Blockers" },
-  { path: "insights.people", label: "People" },
-  { path: "insights.priorities", label: "Priorities" },
-  { path: "insights.themes", label: "Themes" },
-];
-
-function linesToList(s: string): string[] {
-  return s
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0);
+function formatRecordedAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  } catch {
+    return iso;
+  }
 }
 
-function listToLines(items: string[]): string {
-  return items.join("\n");
+/** Prefer raw transcript; fall back to cleaned text when transcript is empty. */
+function transcriptionText(entry: JournalEntry): string {
+  const t = entry.transcript?.trim();
+  if (t) return t;
+  return entry.cleaned_text?.trim() ?? "";
 }
 
-function emptyInsights(): Insights {
-  return {
-    key_points: [],
-    projects: [],
-    goals: [],
-    blockers: [],
-    people: [],
-    priorities: [],
-    themes: [],
-  };
-}
-
-function applyServerEntry(e: JournalEntry): {
-  summary: string;
-  sentiment: string;
-  cleanedText: string;
-  transcript: string;
-  keyPoints: string;
-  goals: string;
-  blockers: string;
-  people: string;
-  priorities: string;
-  themes: string;
-  projects: ProjectInsightItem[];
-  locks: string[];
-} {
-  const ins = e.insights ?? emptyInsights();
-  return {
-    summary: e.summary ?? "",
-    sentiment: e.sentiment_score != null ? String(e.sentiment_score) : "",
-    cleanedText: e.cleaned_text ?? "",
-    transcript: e.transcript ?? "",
-    keyPoints: listToLines(ins.key_points),
-    goals: listToLines(ins.goals),
-    blockers: listToLines(ins.blockers),
-    people: listToLines(ins.people),
-    priorities: listToLines(ins.priorities),
-    themes: listToLines(ins.themes),
-    projects: ins.projects?.length ? ins.projects.map((p) => ({ ...p })) : [{ name: "", notes: "" }],
-    locks: [...(e.insights_field_locks ?? [])],
-  };
+/**
+ * STT and pipelines often inject hard line breaks every segment; `pre-wrap` then looks choppy.
+ * Collapse single newlines into spaces; keep blank-line gaps as paragraphs.
+ */
+function normalizeProseForDisplay(raw: string): string {
+  const normalized = raw.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return "";
+  return normalized
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/\n/g, " ").replace(/[ \t]+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function EntryDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const backPath = useMemo(
+    () => safeEntryBackPath((location.state as EntryDetailNavState | null)?.from),
+    [location.state],
+  );
+  const backLabel = useMemo(() => entryBackLinkLabel(backPath), [backPath]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [meta, setMeta] = useState<Pick<JournalEntry, "id" | "created_at" | "updated_at" | "source"> | null>(
-    null,
-  );
-
-  const [summary, setSummary] = useState("");
-  const [sentiment, setSentiment] = useState("");
-  const [cleanedText, setCleanedText] = useState("");
-  const [transcript, setTranscript] = useState("");
-  const [keyPoints, setKeyPoints] = useState("");
-  const [goals, setGoals] = useState("");
-  const [blockers, setBlockers] = useState("");
-  const [people, setPeople] = useState("");
-  const [priorities, setPriorities] = useState("");
-  const [themes, setThemes] = useState("");
-  const [projects, setProjects] = useState<ProjectInsightItem[]>([{ name: "", notes: "" }]);
-  const [locks, setLocks] = useState<string[]>([]);
-
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [saveOk, setSaveOk] = useState(false);
-
-  const hydrate = useCallback((e: JournalEntry) => {
-    const f = applyServerEntry(e);
-    setMeta({
-      id: e.id,
-      created_at: e.created_at,
-      updated_at: e.updated_at,
-      source: e.source,
-    });
-    setSummary(f.summary);
-    setSentiment(f.sentiment);
-    setCleanedText(f.cleanedText);
-    setTranscript(f.transcript);
-    setKeyPoints(f.keyPoints);
-    setGoals(f.goals);
-    setBlockers(f.blockers);
-    setPeople(f.people);
-    setPriorities(f.priorities);
-    setThemes(f.themes);
-    setProjects(f.projects);
-    setLocks(f.locks);
-  }, []);
+  const [entry, setEntry] = useState<JournalEntry | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -135,7 +59,7 @@ export function EntryDetailPage() {
       setError(null);
       try {
         const e = await getEntry(id);
-        if (!cancelled) hydrate(e);
+        if (!cancelled) setEntry(e);
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof ApiError ? e.message : "Failed to load entry");
@@ -147,95 +71,7 @@ export function EntryDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, hydrate]);
-
-  function buildInsights(): InsightsPayload {
-    const proj = projects
-      .map((p) => ({ name: p.name.trim(), notes: (p.notes || "").trim() }))
-      .filter((p) => p.name.length >= 2);
-    return {
-      key_points: linesToList(keyPoints),
-      projects: proj,
-      goals: linesToList(goals),
-      blockers: linesToList(blockers),
-      people: linesToList(people),
-      priorities: linesToList(priorities),
-      themes: linesToList(themes),
-    };
-  }
-
-  function parseSentiment(): number | null {
-    const t = sentiment.trim();
-    if (t === "") return null;
-    const n = Number(t);
-    if (Number.isNaN(n) || n < -1 || n > 1) {
-      throw new Error("Sentiment must be a number between -1 and 1, or empty.");
-    }
-    return n;
-  }
-
-  async function onSave(e: FormEvent) {
-    e.preventDefault();
-    if (!id) return;
-    setSaveError(null);
-    setSaveOk(false);
-    setSaving(true);
-    try {
-      const insights = buildInsights();
-      const body: PatchEntryBody = {
-        summary: summary.trim() || null,
-        cleaned_text: cleanedText.trim() || null,
-        transcript: transcript.trim() || null,
-        insights,
-        insights_field_locks: locks,
-      };
-      if (sentiment.trim() !== "") {
-        body.sentiment_score = parseSentiment();
-      }
-      await patchEntry(id, body);
-      const fresh = await getEntry(id);
-      hydrate(fresh);
-      setSaveOk(true);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function onReanalyze() {
-    if (!id) return;
-    setAnalyzeError(null);
-    setSaveOk(false);
-    setAnalyzing(true);
-    try {
-      const fresh = await analyzeEntry(id, true);
-      hydrate(fresh);
-    } catch (err) {
-      setAnalyzeError(err instanceof Error ? err.message : "Re-analyze failed");
-    } finally {
-      setAnalyzing(false);
-    }
-  }
-
-  function toggleLock(path: string) {
-    setLocks((prev) => (prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]));
-  }
-
-  function updateProject(i: number, field: keyof ProjectInsightItem, value: string) {
-    setProjects((rows) => {
-      const next = rows.map((r, j) => (j === i ? { ...r, [field]: value } : r));
-      return next;
-    });
-  }
-
-  function addProjectRow() {
-    setProjects((rows) => [...rows, { name: "", notes: "" }]);
-  }
-
-  function removeProjectRow(i: number) {
-    setProjects((rows) => rows.filter((_, j) => j !== i));
-  }
+  }, [id]);
 
   if (!id) {
     return <p className="muted">Missing entry id.</p>;
@@ -252,196 +88,92 @@ export function EntryDetailPage() {
           {error}
         </p>
         <p style={{ margin: 0 }}>
-          <Link to="/history" className="link-back">
-            ← Back to history
+          <Link to={backPath} className="link-back">
+            ← {backLabel}
           </Link>
         </p>
       </div>
     );
   }
 
+  if (!entry) {
+    return null;
+  }
+
+  const transcription = normalizeProseForDisplay(transcriptionText(entry));
+  const summaryText = normalizeProseForDisplay(entry.summary?.trim() ?? "");
+  const emotion = emotionRatingFromSentiment(entry.sentiment_score);
+
   return (
-    <div className="page-shell stack-lg">
-      <p style={{ margin: 0 }}>
-        <Link to="/history" className="link-back">
-          ← History
+    <div className="page-shell entry-detail-page">
+      <header className="entry-detail-topbar">
+        <Link to={backPath} className="link-back entry-detail-topbar__back">
+          ← {backLabel}
         </Link>
-      </p>
+        <time className="entry-detail-topbar__date" dateTime={entry.created_at}>
+          {formatRecordedAt(entry.created_at)}
+        </time>
+      </header>
 
-      {meta ? (
-        <div className="ui-card meta-panel">
-          <div>
-            <strong>Source:</strong> {meta.source}
-          </div>
-          <div>
-            <strong>Created:</strong> {new Date(meta.created_at).toLocaleString()}
-          </div>
-          <div>
-            <strong>Updated:</strong> {new Date(meta.updated_at).toLocaleString()}
-          </div>
-        </div>
-      ) : null}
+      <section className="entry-detail-block" aria-label="Recording">
+        <span className="entry-detail-block__label">Recording</span>
+        {entry.audio_storage_key ? (
+          <EntryAudioPlayer entryId={entry.id} />
+        ) : (
+          <p className="entry-detail-block__empty">No recording</p>
+        )}
+      </section>
 
-      <form onSubmit={onSave} style={{ display: "grid", gap: "1.25rem" }}>
-        <section>
-          <h3>Summary & sentiment</h3>
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span>Summary</span>
-            <textarea
-              className="field-textarea"
-              value={summary}
-              onChange={(e) => setSummary(e.target.value)}
-              rows={3}
-            />
-          </label>
-          <label style={{ display: "grid", gap: "0.35rem", marginTop: "0.75rem" }}>
-            <span>Sentiment score (-1 … 1)</span>
-            <input
-              type="text"
-              inputMode="decimal"
-              className="field-narrow"
-              value={sentiment}
-              onChange={(e) => setSentiment(e.target.value)}
-              placeholder="e.g. 0.2"
-            />
-          </label>
-        </section>
+      <section className="entry-detail-block" aria-label="Transcription">
+        <span className="entry-detail-block__label">Transcription</span>
+        {transcription ? (
+          <p className="entry-detail-block__body">{transcription}</p>
+        ) : (
+          <p className="entry-detail-block__empty">None</p>
+        )}
+      </section>
 
-        <section>
-          <h3>Text</h3>
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            <span>Cleaned text</span>
-            <textarea
-              className="field-textarea"
-              value={cleanedText}
-              onChange={(e) => setCleanedText(e.target.value)}
-            />
-          </label>
-          <label style={{ display: "grid", gap: "0.35rem", marginTop: "0.75rem" }}>
-            <span>Transcript</span>
-            <textarea
-              className="field-textarea"
-              value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
-            />
-          </label>
-        </section>
+      <section className="entry-detail-block" aria-label="Summary">
+        <span className="entry-detail-block__label">Summary</span>
+        {summaryText ? (
+          <p className="entry-detail-block__body">{summaryText}</p>
+        ) : (
+          <p className="entry-detail-block__empty">None</p>
+        )}
+      </section>
 
-        <section>
-          <h3>Insights</h3>
-          <p className="muted" style={{ fontSize: "0.85rem", marginTop: 0 }}>
-            List fields: one item per line (matches <code>insights.schema.json</code> string arrays).
-          </p>
-
-          {(
-            [
-              ["Key points", keyPoints, setKeyPoints],
-              ["Goals", goals, setGoals],
-              ["Blockers", blockers, setBlockers],
-              ["People", people, setPeople],
-              ["Priorities", priorities, setPriorities],
-              ["Themes", themes, setThemes],
-            ] as const
-          ).map(([label, val, setVal]) => (
-            <label key={label} style={{ display: "grid", gap: "0.35rem", marginBottom: "0.75rem" }}>
-              <span>{label}</span>
-              <textarea className="field-textarea" value={val} onChange={(e) => setVal(e.target.value)} />
-            </label>
-          ))}
-
-          <div style={{ marginTop: "0.5rem" }}>
-            <div style={{ fontWeight: 650, marginBottom: "0.5rem" }}>Projects (name + notes)</div>
-            <p className="muted" style={{ fontSize: "0.85rem", marginTop: 0 }}>
-              Names must be at least 2 characters to persist (server rule).
-            </p>
-            {projects.map((p, i) => (
-              <div
-                key={i}
-                className="ui-card"
-                style={{
-                  display: "grid",
-                  gap: "0.35rem",
-                  marginBottom: "0.65rem",
-                  padding: "0.75rem 0.9rem",
-                }}
-              >
-                <input
-                  placeholder="Name"
-                  value={p.name}
-                  onChange={(e) => updateProject(i, "name", e.target.value)}
-                />
-                <input
-                  placeholder="Notes"
-                  value={p.notes}
-                  onChange={(e) => updateProject(i, "notes", e.target.value)}
-                />
-                <button type="button" onClick={() => removeProjectRow(i)} style={{ justifySelf: "start" }}>
-                  Remove row
-                </button>
-              </div>
-            ))}
-            <button type="button" onClick={addProjectRow}>
-              Add project row
-            </button>
-          </div>
-        </section>
-
-        <section>
-          <h3>AI re-analyze locks</h3>
-          <p className="muted" style={{ fontSize: "0.85rem", marginTop: 0 }}>
-            Checked paths are preserved when you run <strong>Re-analyze</strong> with{" "}
-            <code>preserve_locked_fields: true</code> (see <code>docs/DATA_CONTRACTS.md</code> §Insights).
-          </p>
+      <section className="entry-detail-block" aria-label="Emotion">
+        <span className="entry-detail-block__label">Emotion</span>
+        {emotion ? (
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-              gap: "0.35rem 1rem",
-            }}
+            className="entry-emotion"
+            role="group"
+            aria-label={`Emotion ${emotion.label}, intensity ${emotion.value} of 10 (1 is low, 10 is high)`}
           >
-            {LOCK_OPTIONS.map((o) => (
-              <label key={o.path} style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                <input
-                  type="checkbox"
-                  checked={locks.includes(o.path)}
-                  onChange={() => toggleLock(o.path)}
+            <div className="entry-emotion__row">
+              <p className="entry-emotion__name">{emotion.label}</p>
+              <div className="entry-emotion__score" aria-hidden="true">
+                <span className="entry-emotion__score-num">{emotion.value}</span>
+                <span className="entry-emotion__score-max">/10</span>
+              </div>
+            </div>
+            <div className="entry-emotion__meter-wrap" aria-hidden="true">
+              <div className="entry-emotion__meter-track">
+                <span
+                  className="entry-emotion__meter-marker"
+                  style={{ left: `${emotionMarkerPercent(emotion.value)}%` }}
                 />
-                <span style={{ fontSize: "0.9rem" }}>{o.label}</span>
-              </label>
-            ))}
+              </div>
+              <div className="entry-emotion__scale">
+                <span>1 · low</span>
+                <span>10 · high</span>
+              </div>
+            </div>
           </div>
-        </section>
-
-        {saveError ? (
-          <p role="alert" className="text-error" style={{ margin: 0 }}>
-            {saveError}
-          </p>
-        ) : null}
-        {saveOk ? (
-          <p className="text-success" style={{ margin: 0 }} role="status">
-            Saved.
-          </p>
-        ) : null}
-
-        <div className="form-actions">
-          <button type="submit" className="btn-gold" disabled={saving}>
-            {saving ? "Saving…" : "Save changes"}
-          </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => void onReanalyze()}
-            disabled={analyzing}
-          >
-            {analyzing ? "Re-analyzing…" : "Re-analyze"}
-          </button>
-        </div>
-        {analyzeError ? (
-          <p role="alert" className="text-error" style={{ margin: 0 }}>
-            {analyzeError}
-          </p>
-        ) : null}
-      </form>
+        ) : (
+          <p className="entry-detail-block__empty">No rating yet</p>
+        )}
+      </section>
     </div>
   );
 }

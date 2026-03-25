@@ -1,18 +1,24 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { listEntries } from "../api/client";
 import type { JournalEntry } from "../api/types";
-import { DuckRecordButton } from "../components/DuckRecordButton";
+import { DuckMicButton, DuckRecordButton } from "../components/DuckRecordButton";
+import { EntryAudioPlayer } from "../components/EntryAudioPlayer";
+import { EntryRemoveButton } from "../components/EntryRemoveButton";
 import { useAuth } from "../auth/AuthContext";
+import { useJournalRecording } from "../hooks/useJournalRecording";
 
 function previewText(entry: JournalEntry): string {
-  const s = entry.summary?.trim();
-  if (s) return s.length > 160 ? `${s.slice(0, 157)}…` : s;
-  const c = entry.cleaned_text?.trim();
-  if (c) return c.length > 160 ? `${c.slice(0, 157)}…` : c;
-  const t = entry.transcript?.trim();
-  if (t) return t.length > 160 ? `${t.slice(0, 157)}…` : t;
-  return "(No text yet)";
+  const pick = (): string => {
+    const s = entry.summary?.trim();
+    if (s) return s;
+    const c = entry.cleaned_text?.trim();
+    if (c) return c;
+    const t = entry.transcript?.trim();
+    if (t) return t;
+    return "(No text yet)";
+  };
+  return pick().replace(/\s+/g, " ").trim();
 }
 
 function formatWhen(iso: string): string {
@@ -24,11 +30,28 @@ function formatWhen(iso: string): string {
   }
 }
 
+/** Dashboard list: only this many newest entries (full archive is on History). */
+const DASHBOARD_RECENT_LIMIT = 6;
+
+function newestFirst(entries: JournalEntry[]): JournalEntry[] {
+  return [...entries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
 export function Dashboard() {
   const { token } = useAuth();
   const [items, setItems] = useState<JournalEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const refreshEntries = useCallback(() => {
+    if (!token) return;
+    listEntries(DASHBOARD_RECENT_LIMIT, 0)
+      .then((data) => setItems(newestFirst(data.items).slice(0, DASHBOARD_RECENT_LIMIT)))
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load entries"));
+  }, [token]);
+
+  const { supported, phase, error: recordError, uploadPct, savedToast, onDuckPress } =
+    useJournalRecording(refreshEntries);
 
   useEffect(() => {
     if (!token) {
@@ -54,22 +77,62 @@ export function Dashboard() {
     };
   }, [token]);
 
+  const recentEntries = useMemo(() => {
+    if (!items?.length) return [];
+    return newestFirst(items).slice(0, DASHBOARD_RECENT_LIMIT);
+  }, [items]);
+
   return (
-    <>
+    <div className="page-shell">
       <section className="dashboard-hero" aria-labelledby="dashboard-hero-title">
         <h2 id="dashboard-hero-title" className="dashboard-hero__title">
           Talk to the duck
         </h2>
-        {token ? (
-          <p className="dashboard-hero__subtitle">
-            The duck is how you speak your thoughts and save them. Tap when something’s on your mind — no
-            typing required.
-          </p>
-        ) : (
-          <p className="dashboard-hero__subtitle">The duck helps you capture what you’re thinking.</p>
-        )}
+        <p className="dashboard-hero__subtitle">The duck helps you capture what you’re thinking.</p>
         <div className="dashboard-duck-wrap">
-          <DuckRecordButton authenticated={Boolean(token)} />
+          {token ? (
+            <div className="dashboard-duck-inline">
+              {savedToast ? (
+                <div className="toast-alert toast-alert--dashboard" role="status">
+                  Thought saved
+                </div>
+              ) : null}
+              {!supported ? (
+                <p role="alert" className="text-error dashboard-duck-inline__msg">
+                  Recording is not supported in this browser.
+                </p>
+              ) : null}
+              {recordError ? (
+                <p role="alert" className="text-error dashboard-duck-inline__msg">
+                  {recordError}
+                </p>
+              ) : null}
+              <DuckMicButton
+                recording={phase === "recording"}
+                uploading={phase === "uploading"}
+                disabled={!supported || !token}
+                onPress={onDuckPress}
+              />
+              {phase === "uploading" && uploadPct !== null ? (
+                <div className="dashboard-upload-progress">
+                  <div
+                    className="progress-track"
+                    role="progressbar"
+                    aria-valuenow={uploadPct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <div className="progress-fill" style={{ width: `${uploadPct}%` }} />
+                  </div>
+                  <p className="muted" style={{ marginTop: "0.35rem", marginBottom: 0, fontSize: "0.88rem" }}>
+                    {uploadPct}%
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <DuckRecordButton authenticated={false} />
+          )}
         </div>
       </section>
 
@@ -113,26 +176,53 @@ export function Dashboard() {
         </section>
       ) : null}
 
-      {token && items && items.length > 0 ? (
-        <section>
-          <h3 className="section-label">Recent entries</h3>
+      {token && recentEntries.length > 0 ? (
+        <section className="dashboard-recent">
+          <div className="dashboard-recent__head">
+            <h3 className="section-label dashboard-recent__title">Recent entries</h3>
+            <p className="dashboard-recent__hint muted">
+              Your {recentEntries.length} most recent {recentEntries.length === 1 ? "entry" : "entries"}.{" "}
+              <Link to="/history" className="dashboard-recent__history-link">
+                See all entries in History
+              </Link>
+              .
+            </p>
+          </div>
           <ul className="entry-list">
-            {items.map((entry) => (
-              <li key={entry.id}>
-                <Link
-                  to={`/entries/${entry.id}`}
-                  className="entry-card-link"
-                >
-                  <strong style={{ fontWeight: 600 }}>{previewText(entry)}</strong>
-                  <div className="entry-card-meta">
-                    {formatWhen(entry.created_at)} · {entry.source}
+            {recentEntries.map((entry) => (
+              <li key={entry.id} className="entry-list-item">
+                <div className="entry-list-item__bubble-wrap">
+                  <time className="entry-list-item__recorded" dateTime={entry.created_at}>
+                    Recorded {formatWhen(entry.created_at)}
+                  </time>
+                  <div className="entry-list-item__card-row">
+                    <EntryRemoveButton
+                      entryId={entry.id}
+                      onRemoved={() =>
+                        setItems((prev) => (prev ? prev.filter((x) => x.id !== entry.id) : prev))
+                      }
+                    />
+                    <Link
+                      to={`/entries/${entry.id}`}
+                      state={{ from: "/" }}
+                      className="entry-card-link entry-card-link--oneline"
+                    >
+                      <span className="entry-card-oneline">
+                        <strong className="entry-card-oneline__title">{previewText(entry)}</strong>
+                      </span>
+                    </Link>
                   </div>
-                </Link>
+                  {entry.audio_storage_key ? (
+                    <div className="entry-list-item__audio">
+                      <EntryAudioPlayer entryId={entry.id} compact />
+                    </div>
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
         </section>
       ) : null}
-    </>
+    </div>
   );
 }

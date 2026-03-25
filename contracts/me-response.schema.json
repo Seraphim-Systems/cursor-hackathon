@@ -8,10 +8,11 @@
   "properties": {
     "user": {
       "type": "object",
-      "required": ["id", "email"],
+      "required": ["id", "email", "is_admin"],
       "properties": {
         "id": { "type": "string" },
-        "email": { "type": "string", "format": "email" }
+        "email": { "type": "string", "format": "email" },
+        "is_admin": { "type": "boolean" }
       },
       "additionalProperties": true
     },
