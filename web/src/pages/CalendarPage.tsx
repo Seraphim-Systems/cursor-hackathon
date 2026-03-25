@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getCalendar, getPeriodSummary, refreshPeriodSummary } from "../api/client";
 import { Link } from "react-router-dom";
 import type { CalendarDay, PeriodSummary } from "../api/types";
@@ -11,15 +11,11 @@ export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const [summary, setSummary] = useState<PeriodSummary | null>(null);
-  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
 
-  useEffect(() => {
-    fetchSummary();
-  }, [view, selectedYear, selectedMonth, selectedWeekStart, selectedDay]);
-
-  const getPeriodParams = () => {
+  const getPeriodParams = useCallback(() => {
     let from: string, to: string, type: string;
 
     if (view === "year") {
@@ -45,30 +41,41 @@ export default function CalendarPage() {
       return null;
     }
     return { from, to, type };
-  };
+  }, [view, selectedYear, selectedMonth, selectedWeekStart, selectedDay]);
 
-  const fetchSummary = async () => {
+  const fetchData = useCallback(async () => {
     const params = getPeriodParams();
     if (!params) return;
 
-    setLoadingSummary(true);
-    setSummary(null);
+    setLoading(true);
+    // Don't clear summary/calendar immediately to avoid layout jump if possible, 
+    // but the user wants to ensure calendar days are correctly displayed.
 
     try {
-      const data = await getPeriodSummary(params.from, params.to, params.type);
-      setSummary(data);
+      const promises: [Promise<PeriodSummary>, Promise<any>?] = [
+        getPeriodSummary(params.from, params.to, params.type)
+      ];
       
-      // Also fetch calendar dots if in year/month view
       if (view === "year" || view === "month") {
-        const cal = await getCalendar(params.from, params.to);
-        setCalendarData(cal.days);
+        promises.push(getCalendar(params.from, params.to));
+      }
+
+      const [summaryData, calendarRes] = await Promise.all(promises);
+      
+      setSummary(summaryData);
+      if (calendarRes) {
+        setCalendarData(calendarRes.days);
       }
     } catch (err) {
       console.error(err);
     } finally {
-      setLoadingSummary(false);
+      setLoading(false);
     }
-  };
+  }, [getPeriodParams, view]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleRefresh = async () => {
     const params = getPeriodParams();
@@ -91,49 +98,24 @@ export default function CalendarPage() {
     "July", "August", "September", "October", "November", "December"
   ];
 
-  const colors = {
-    purple: "#6b46c1",
-    purpleLight: "#f3f0ff",
-    gold: "#ecc94b",
-    goldLight: "#fefcbf",
-    goldDark: "#b7791f",
-    white: "#ffffff",
-    gray: "#718096"
-  };
-
   return (
-    <div style={{ padding: "2rem", maxWidth: "1000px", margin: "0 auto" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "2rem" }}>
-        <h2 style={{ margin: 0, color: colors.purple }}>Calendar Insights</h2>
+    <div className="page-shell stack-lg">
+      <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+        <h2 className="page-title" style={{ margin: 0 }}>Calendar Insights</h2>
         <div style={{ flex: 1 }} />
         <nav style={{ display: "flex", gap: "0.5rem" }}>
           <button 
             onClick={() => setView("year")}
-            style={{ 
-              padding: "0.5rem 1rem", 
-              borderRadius: "4px", 
-              border: `1px solid ${colors.purple}`, 
-              background: view === "year" ? colors.purple : colors.white, 
-              color: view === "year" ? colors.white : colors.purple,
-              fontWeight: "bold",
-              cursor: "pointer"
-            }}
+            className={view === "year" ? "btn-gold" : "btn-ghost"}
+            style={{ padding: "0.4rem 0.8rem", fontSize: "0.85rem" }}
           >
             Year
           </button>
           <button 
             disabled={view === "year"}
             onClick={() => setView("month")}
-            style={{ 
-              padding: "0.5rem 1rem", 
-              borderRadius: "4px", 
-              border: `1px solid ${colors.purple}`, 
-              background: view === "month" ? colors.purple : colors.white, 
-              color: view === "month" ? colors.white : colors.purple,
-              fontWeight: "bold",
-              cursor: view === "year" ? "not-allowed" : "pointer",
-              opacity: view === "year" ? 0.5 : 1
-            }}
+            className={view === "month" ? "btn-gold" : "btn-ghost"}
+            style={{ padding: "0.4rem 0.8rem", fontSize: "0.85rem" }}
           >
             Month
           </button>
@@ -141,109 +123,112 @@ export default function CalendarPage() {
       </div>
 
       {/* Selectors */}
-      <div style={{ marginBottom: "2rem", display: "flex", gap: "1rem" }}>
-        <select 
-          value={selectedYear} 
-          onChange={(e) => { setSelectedYear(Number(e.target.value)); setView("year"); }}
-          style={{ padding: "0.5rem", borderRadius: "4px", border: `1px solid ${colors.gold}`, background: colors.goldLight }}
-        >
-          {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-        </select>
+      <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+        <div className="form-field">
+          <select 
+            value={selectedYear} 
+            onChange={(e) => { setSelectedYear(Number(e.target.value)); setView("year"); }}
+            className="field-narrow"
+          >
+            {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
 
         {(view === "month" || view === "week" || view === "day") && (
-          <select 
-            value={selectedMonth} 
-            onChange={(e) => { setSelectedMonth(Number(e.target.value)); setView("month"); }}
-            style={{ padding: "0.5rem", borderRadius: "4px", border: `1px solid ${colors.gold}`, background: colors.goldLight }}
-          >
-            {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-          </select>
+          <div className="form-field">
+            <select 
+              value={selectedMonth} 
+              onChange={(e) => { setSelectedMonth(Number(e.target.value)); setView("month"); }}
+              className="field-narrow"
+            >
+              {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+          </div>
         )}
       </div>
 
       {/* Grid View */}
       {view === "year" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "3rem" }}>
+        <div style={{ 
+          display: "grid", 
+          gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", 
+          gap: "1rem" 
+        }}>
           {months.map((m, i) => (
             <div 
               key={m} 
               onClick={() => { setSelectedMonth(i + 1); setView("month"); }}
+              className="calendar-tree-row"
               style={{ 
-                padding: "1.5rem", 
-                border: `1px solid ${colors.gold}`, 
-                borderRadius: "8px", 
-                textAlign: "center", 
-                cursor: "pointer",
-                background: selectedMonth === i + 1 && view !== "year" ? colors.goldLight : colors.white,
-                transition: "all 0.2s"
+                padding: "1.25rem",
+                justifyContent: "center",
+                background: selectedMonth === i + 1 && view !== "year" ? "var(--color-complement-muted)" : undefined
               }}
-              onMouseOver={(e) => e.currentTarget.style.boxShadow = `0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)`}
-              onMouseOut={(e) => e.currentTarget.style.boxShadow = "none"}
             >
-              <h4 style={{ margin: 0, color: colors.purple }}>{m}</h4>
+              <h4 style={{ margin: 0, color: "var(--color-accent)" }}>{m}</h4>
             </div>
           ))}
         </div>
       )}
 
       {view === "month" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "0.5rem", marginBottom: "3rem" }}>
-          {/* Simple Day Grid */}
+        <div style={{ 
+          display: "grid", 
+          gridTemplateColumns: "repeat(7, 1fr)", 
+          gap: "0.5rem"
+        }}>
           {calendarData.map((d) => (
             <div 
               key={d.date} 
               onClick={() => { setSelectedDay(d.date); setView("day"); }}
+              className="ui-card"
               style={{ 
                 padding: "0.5rem", 
-                border: `1px solid ${colors.goldLight}`, 
-                borderRadius: "4px", 
-                height: "60px",
+                height: "64px",
                 cursor: "pointer",
-                background: d.count > 0 ? colors.goldLight : colors.white,
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                transition: "all 0.2s"
+                borderColor: d.count > 0 ? "var(--color-accent)" : undefined,
+                background: d.date === selectedDay ? "var(--color-complement-muted)" : undefined
               }}
-              onMouseOver={(e) => e.currentTarget.style.borderColor = colors.gold}
-              onMouseOut={(e) => e.currentTarget.style.borderColor = colors.goldLight}
             >
-              <span style={{ fontSize: "0.8rem", color: colors.gray }}>{new Date(d.date).getDate()}</span>
-              {d.count > 0 && <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: colors.purple, marginTop: "4px" }} />}
+              <span style={{ fontSize: "0.85rem", fontWeight: "600" }}>{new Date(d.date).getUTCDate()}</span>
+              {d.count > 0 && (
+                <div style={{ 
+                  width: "6px", 
+                  height: "6px", 
+                  borderRadius: "50%", 
+                  background: "var(--color-complement-bright)", 
+                  marginTop: "4px",
+                  boxShadow: "0 0 8px var(--color-complement-bright)"
+                }} />
+              )}
             </div>
           ))}
         </div>
       )}
 
       {/* Summary Section */}
-      <section style={{ padding: "2rem", border: `2px solid ${colors.gold}`, borderRadius: "12px", background: colors.purpleLight }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
-          <h3 style={{ marginTop: 0, color: colors.purple }}>
-            {loadingSummary ? "Generating AI Insights..." : (
+      <section className="ui-card stack-lg" style={{ 
+        border: "1px solid var(--color-border-strong)",
+        background: "linear-gradient(165deg, var(--color-complement-muted) 0%, transparent 100%)"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+          <h3 style={{ margin: 0, color: "var(--color-accent)" }}>
+            {loading ? "Generating AI Insights..." : (
               view === "year" ? `${selectedYear} Yearly Summary` :
               view === "month" ? `${months[selectedMonth-1]} ${selectedYear} Summary` :
               view === "day" ? `${selectedDay} Daily Summary` : "Summary"
             )}
           </h3>
-          {summary && !loadingSummary && (
+          {summary && !loading && (
             <button
               onClick={handleRefresh}
               disabled={refreshing}
-              style={{
-                padding: "0.4rem 0.8rem",
-                borderRadius: "4px",
-                border: `1px solid ${colors.purple}`,
-                background: colors.white,
-                color: colors.purple,
-                fontSize: "0.85rem",
-                fontWeight: "bold",
-                cursor: refreshing ? "not-allowed" : "pointer",
-                opacity: refreshing ? 0.7 : 1,
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem"
-              }}
+              className="btn-ghost"
+              style={{ fontSize: "0.8rem", padding: "0.35rem 0.7rem" }}
             >
               {refreshing ? "Refreshing..." : "↻ Refresh AI Summary"}
             </button>
@@ -251,44 +236,66 @@ export default function CalendarPage() {
         </div>
 
         {summary ? (
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "2rem" }}>
-            <div>
-              <p style={{ fontSize: "1.1rem", lineHeight: "1.6", color: "#2d3748" }}>{summary.summary}</p>
+          <div style={{ 
+            display: "grid", 
+            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", 
+            gap: "2rem" 
+          }}>
+            <div className="stack-lg">
+              <p style={{ fontSize: "1.05rem", lineHeight: "1.6" }}>{summary.summary}</p>
               
-              <h4 style={{ color: colors.purple, borderBottom: `2px solid ${colors.gold}`, paddingBottom: "0.5rem" }}>Key Achievements</h4>
-              <ul style={{ paddingLeft: "1.5rem" }}>
-                {summary.key_achievements.map((a, i) => <li key={i} style={{ marginBottom: "0.5rem" }}>{a}</li>)}
-              </ul>
+              <div>
+                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Key Achievements</h4>
+                <ul className="stack-lg" style={{ gap: "0.5rem", paddingLeft: "1.2rem", margin: 0 }}>
+                  {summary.key_achievements.map((a, i) => (
+                    <li key={i} style={{ fontSize: "0.95rem" }}>{a}</li>
+                  ))}
+                </ul>
+              </div>
             </div>
-            <div style={{ background: colors.white, padding: "1.5rem", borderRadius: "8px", border: `1px solid ${colors.goldLight}` }}>
-              <h4 style={{ color: colors.purple, marginTop: 0 }}>Mood & Trends</h4>
-              <p style={{ color: "#4a5568" }}>{summary.sentiment_trend}</p>
 
-              <h4 style={{ color: colors.purple }}>Top Themes</h4>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {summary.top_themes.map(t => (
-                  <span key={t} style={{ background: colors.goldLight, color: colors.goldDark, padding: "0.2rem 0.6rem", borderRadius: "12px", fontSize: "0.85rem", fontWeight: "bold" }}>{t}</span>
-                ))}
+            <div className="ui-card stack-lg" style={{ background: "rgba(0,0,0,0.2)", border: "1px solid var(--color-border)" }}>
+              <div>
+                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Mood & Trends</h4>
+                <p style={{ margin: 0, fontSize: "0.92rem", color: "var(--color-text-muted)" }}>{summary.sentiment_trend}</p>
               </div>
 
-              <h4 style={{ color: colors.purple }}>People</h4>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {summary.significant_people.map(p => (
-                  <span key={p} style={{ background: colors.purpleLight, color: colors.purple, padding: "0.2rem 0.6rem", borderRadius: "12px", fontSize: "0.85rem", fontWeight: "bold" }}>{p}</span>
-                ))}
+              <div>
+                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Top Themes</h4>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {summary.top_themes.map(t => (
+                    <span key={t} className="calendar-tree-row__meta" style={{ background: "var(--color-accent-glow)", color: "var(--color-accent)" }}>
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Significant People</h4>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {summary.significant_people.map(p => (
+                    <span key={p} className="calendar-tree-row__meta">
+                      {p}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        ) : !loadingSummary && (
-          <p style={{ color: colors.gray }}>No data available for this period. Try selecting a different timeframe or adding more entries.</p>
+        ) : !loading && (
+          <div className="empty-state" style={{ padding: "2rem" }}>
+            <p style={{ margin: 0 }}>No data available for this period.</p>
+          </div>
         )}
       </section>
 
       {view === "day" && selectedDay && (
-         <div style={{ marginTop: "2rem", textAlign: "center" }}>
+         <div style={{ textAlign: "center", marginTop: "1rem" }}>
             <Link 
               to={`/history?from=${selectedDay}&to=${selectedDay}`}
-              style={{ color: colors.purple, fontWeight: "bold", textDecoration: "none", borderBottom: `2px solid ${colors.gold}` }}
+              className="btn-gold btn-gold--outline"
+              style={{ fontSize: "0.9rem" }}
             >
               View all recordings for this day →
             </Link>
