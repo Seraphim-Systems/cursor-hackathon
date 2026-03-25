@@ -15,6 +15,7 @@ from app.infrastructure.persistence.documents import (
     JournalEntryDocument,
     ProjectDocument,
     UserDocument,
+    PeriodSummaryDocument,
 )
 
 # Configure logging

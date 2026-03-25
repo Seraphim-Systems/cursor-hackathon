@@ -94,6 +94,7 @@ async def create_entry(
     repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
     storage: Annotated[IAudioStorage, Depends(get_audio_storage)],
     transcriber: Annotated[ITranscriber, Depends(get_transcriber)],
+    analyzer: Annotated[IAIAnalyzer, Depends(get_analyzer)],
 ) -> JournalEntryOut:
     """Create an entry from JSON or multipart (optional `audio` part per DATA_CONTRACTS §Entries)."""
     user_id = str(user.id)
@@ -112,7 +113,14 @@ async def create_entry(
             sentiment_score=body.sentiment_score,
             insights=insights_dict,
             insights_field_locks=body.insights_field_locks,
+            created_at=body.created_at,
         )
+        if body.run_analysis:
+            doc = await reanalyze_journal_entry(
+                entry=doc,
+                preserve_locked_fields=True,
+                analyzer=analyzer,
+            )
         return journal_entry_to_out(doc)
 
     if content_type == "multipart/form-data":
@@ -131,6 +139,10 @@ async def create_entry(
                 if ct_val is not None and isinstance(ct_val, str) and str(ct_val).strip()
                 else None
             )
+            raw_run = form.get("run_analysis")
+            run_an = False
+            if isinstance(raw_run, str) and raw_run.lower() == "true":
+                run_an = True
             body = JournalEntryCreateBody(
                 source=src,
                 cleaned_text=cleaned,
@@ -140,6 +152,7 @@ async def create_entry(
                 sentiment_score=None,
                 insights=None,
                 insights_field_locks=None,
+                run_analysis=run_an,
             )
 
         up = form.get("audio")
@@ -190,7 +203,14 @@ async def create_entry(
             sentiment_score=body.sentiment_score,
             insights=insights_dict,
             insights_field_locks=body.insights_field_locks,
+            created_at=body.created_at,
         )
+        if body.run_analysis:
+            doc = await reanalyze_journal_entry(
+                entry=doc,
+                preserve_locked_fields=True,
+                analyzer=analyzer,
+            )
         return journal_entry_to_out(doc)
 
     raise HTTPException(

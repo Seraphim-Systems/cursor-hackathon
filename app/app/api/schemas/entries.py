@@ -91,6 +91,7 @@ class JournalEntryCreateBody(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     source: SourceKind
+    created_at: datetime | None = None
     audio_storage_key: str | None = None
     transcript: str | None = None
     cleaned_text: str | None = None
@@ -98,6 +99,7 @@ class JournalEntryCreateBody(BaseModel):
     sentiment_score: float | None = Field(default=None, ge=-1, le=1)
     insights: InsightsOut | None = None
     insights_field_locks: list[str] | None = None
+    run_analysis: bool = False
 
 
 class JournalEntryPatchBody(BaseModel):

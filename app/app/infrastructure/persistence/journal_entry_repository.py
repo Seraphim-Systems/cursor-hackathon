@@ -37,13 +37,15 @@ class JournalEntryRepository:
         sentiment_score: float | None = None,
         insights: dict | None = None,
         insights_field_locks: list[str] | None = None,
+        created_at: datetime | None = None,
     ) -> JournalEntryDocument:
         now = datetime.now(timezone.utc)
+        ts = created_at or now
         ins = InsightsEmbedded.model_validate(insights) if insights else InsightsEmbedded()
         doc = JournalEntryDocument(
             user_id=user_id,
             source=source,
-            created_at=now,
+            created_at=ts,
             updated_at=now,
             audio_storage_key=audio_storage_key,
             transcript=transcript,

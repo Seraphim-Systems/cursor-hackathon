@@ -1,0 +1,93 @@
+name: Deploy Journal App
+
+on:
+  push:
+    branches:
+      - main  # Adjust this to your production/main branch
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Hetzner
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.INFRA_HETZNER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.INFRA_HETZNER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Sync repository
+        run: |
+          ssh ${{ secrets.INFRA_HETZNER_USER }}@${{ secrets.INFRA_HETZNER_HOST }} << 'ENDSSH'
+          set -e
+          REPO_PATH="/home/${{ secrets.INFRA_HETZNER_USER }}/cursor-hackathon"
+          if [ -d "$REPO_PATH/.git" ]; then
+            cd "$REPO_PATH"
+            git fetch origin
+            git reset --hard origin/main
+            git clean -fd
+          else
+            git clone https://github.com/${{ github.repository }}.git "$REPO_PATH"
+            cd "$REPO_PATH"
+          fi
+          ENDSSH
+
+      - name: Create environment file and Deploy
+        run: |
+          ssh ${{ secrets.INFRA_HETZNER_USER }}@${{ secrets.INFRA_HETZNER_HOST }} << 'ENDSSH'
+          set -e
+          REPO_PATH="/home/${{ secrets.INFRA_HETZNER_USER }}/cursor-hackathon"
+          cd "$REPO_PATH"
+
+          # Create .env file with all necessary secrets for this app
+          cat > .env << EOF
+          MONGODB_URI=${{ secrets.MONGODB_URI }}
+          MONGODB_DB_NAME=${{ secrets.MONGODB_DB_NAME }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_ALGORITHM=${{ secrets.JWT_ALGORITHM || 'HS256' }}
+          JWT_EXPIRE_MINUTES=${{ secrets.JWT_EXPIRE_MINUTES || '60' }}
+          AUDIO_STORAGE_PATH=${{ secrets.AUDIO_STORAGE_PATH || '/data/audio' }}
+          CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+          ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          TRANSCRIPTION_PROVIDER=${{ secrets.TRANSCRIPTION_PROVIDER || 'http_stt' }}
+          STT_BASE_URL=${{ secrets.STT_BASE_URL || 'http://stt:9000' }}
+          STT_TRANSCRIBE_PATH=${{ secrets.STT_TRANSCRIBE_PATH || '/asr' }}
+          STT_FORM_FIELD=${{ secrets.STT_FORM_FIELD || 'audio_file' }}
+          STT_TIMEOUT_SECONDS=${{ secrets.STT_TIMEOUT_SECONDS || '600' }}
+          AI_ANALYSIS_PROVIDER=${{ secrets.AI_ANALYSIS_PROVIDER || 'openai' }}
+          AI_OPENAI_BASE_URL=${{ secrets.AI_OPENAI_BASE_URL || 'https://api.openai.com/v1' }}
+          AI_OPENAI_MODEL=${{ secrets.AI_OPENAI_MODEL || 'gpt-4o-mini' }}
+          AI_HTTP_TIMEOUT_SECONDS=${{ secrets.AI_HTTP_TIMEOUT_SECONDS || '120' }}
+          VITE_API_URL=${{ secrets.VITE_API_URL }}
+          EOF
+
+          # Pull and rebuild
+          docker compose pull
+          docker compose up -d --build
+          
+          # Wait for startup
+          sleep 10
+          ENDSSH
+
+      - name: Verify and Health Check
+        run: |
+          ssh ${{ secrets.INFRA_HETZNER_USER }}@${{ secrets.INFRA_HETZNER_HOST }} << 'ENDSSH'
+          set -e
+          cd /home/${{ secrets.INFRA_HETZNER_USER }}/cursor-hackathon
+          docker compose ps
+          
+          # Basic API Health Check
+          echo "Running health check..."
+          curl -f "http://localhost:8000/api/health" || exit 1
+          ENDSSH
+
+      - name: Cleanup
+        if: always()
+        run: |
+          ssh ${{ secrets.INFRA_HETZNER_USER }}@${{ secrets.INFRA_HETZNER_HOST }} "rm -f /home/${{ secrets.INFRA_HETZNER_USER }}/cursor-hackathon/.env" || true

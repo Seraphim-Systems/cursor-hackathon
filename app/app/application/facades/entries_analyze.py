@@ -30,7 +30,21 @@ async def reanalyze_journal_entry(
     analyzer: IAIAnalyzer,
 ) -> JournalEntryDocument:
     text = (entry.cleaned_text or entry.transcript or "").strip()
-    new_result = await analyzer.analyze(text=text)
+    if not text:
+        return entry
+
+    try:
+        new_result = await analyzer.analyze(text=text)
+    except Exception as e:
+        logger.warning("AI analysis failed quietly: %s", e)
+        # Fail quietly: if summary is missing, provide a basic fallback from the text
+        if not entry.summary:
+            fallback = text[:150] + ("..." if len(text) > 150 else "")
+            entry.summary = fallback
+        entry.updated_at = datetime.now(timezone.utc)
+        await entry.save()
+        return entry
+
     raw_ins = entry.insights
     if raw_ins is None:
         existing_insights = None
@@ -50,6 +64,10 @@ async def reanalyze_journal_entry(
         preserve_locked_fields=preserve_locked_fields,
     )
     entry.summary = summary
+    # If AI returned no summary but we have none, fallback
+    if not entry.summary:
+        entry.summary = text[:150] + ("..." if len(text) > 150 else "")
+
     entry.sentiment_score = sentiment
     entry.insights = InsightsEmbedded.model_validate(insights_dict or {})
     entry.updated_at = datetime.now(timezone.utc)

@@ -80,3 +80,27 @@ class ProjectDocument(Document):
             IndexModel([("user_id", ASCENDING)]),
             IndexModel([("user_id", ASCENDING), ("normalized_name", ASCENDING)]),
         ]
+
+
+class PeriodSummaryDocument(Document):
+    """Cached AI summary for a specific time period (Year, Month, Week, or Day)."""
+
+    user_id: str
+    period_type: Literal["year", "month", "week", "day"]
+    start_date: str  # ISO YYYY-MM-DD
+    end_date: str    # ISO YYYY-MM-DD
+    
+    summary: str
+    sentiment_trend: str
+    key_achievements: list[str] = Field(default_factory=list)
+    top_themes: list[str] = Field(default_factory=list)
+    significant_people: list[str] = Field(default_factory=list)
+
+    last_entry_count: int = 0
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Settings:
+        name = "period_summaries"
+        indexes = [
+            IndexModel([("user_id", ASCENDING), ("period_type", ASCENDING), ("start_date", ASCENDING), ("end_date", ASCENDING)], unique=True),
+        ]

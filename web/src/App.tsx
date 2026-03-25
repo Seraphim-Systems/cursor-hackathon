@@ -10,6 +10,8 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { RecordPage } from "./pages/RecordPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import AdminPage from "./pages/AdminPage";
+import GraphPage from "./pages/GraphPage";
+import CalendarPage from "./pages/CalendarPage";
 
 export function App() {
   const navigate = useNavigate();
@@ -35,7 +37,13 @@ export function App() {
             {token ? (
               <>
                 <NavLink to="/history" className={navCls}>
-                  History
+                  Entries
+                </NavLink>
+                <NavLink to="/calendar" className={navCls}>
+                  Calendar
+                </NavLink>
+                <NavLink to="/graphs" className={navCls}>
+                  Trends
                 </NavLink>
                 <NavLink to="/settings" className={navCls}>
                   Settings
@@ -104,7 +112,22 @@ export function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="/calendar" element={<Navigate to="/history" replace />} />
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <CalendarPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/graphs"
+            element={
+              <ProtectedRoute>
+                <GraphPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/settings"
             element={
