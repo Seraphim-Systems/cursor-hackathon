@@ -122,6 +122,8 @@ export default function GraphPage() {
   const [tab, setTab] = useState<"trends" | "insights_graph">("trends");
   const [error, setError] = useState<string | null>(null);
 
+  const insightGraph = useMemo(() => buildInsightsGraph(entries), [entries]);
+
   useEffect(() => {
     listEntries(200, 0)
       .then((data) => {
@@ -169,8 +171,6 @@ export default function GraphPage() {
   const topThemes = Object.entries(themeCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 15);
-
-  const insightGraph = useMemo(() => buildInsightsGraph(entries), [entries]);
 
   return (
     <div className="page-shell stack-lg" style={{ maxWidth: "1200px", margin: "0 auto" }}>
