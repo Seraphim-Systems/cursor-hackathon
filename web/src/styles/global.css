@@ -1741,7 +1741,6 @@ a.btn-gold.btn-gold--outline:hover,
   margin-bottom: 0.65rem;
 }
 
-.calendar-day__to-week,
 .calendar-day__to-month {
   border: 1px solid var(--color-border);
   border-radius: 999px;
@@ -1753,7 +1752,6 @@ a.btn-gold.btn-gold--outline:hover,
   cursor: pointer;
 }
 
-.calendar-day__to-week:hover,
 .calendar-day__to-month:hover {
   background: rgba(255, 255, 255, 0.05);
   color: var(--color-text);
@@ -1765,13 +1763,72 @@ a.btn-gold.btn-gold--outline:hover,
   line-height: 1.5;
 }
 
-.dashboard-entry-card__link--btn {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
+.calendar-day__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  gap: 1rem;
+  align-items: start;
+  margin-bottom: 0.85rem;
+}
+
+.calendar-day__main {
+  min-width: 0;
+}
+
+.calendar-day__aside {
+  border-left: 1px solid rgba(201, 162, 39, 0.25);
+  padding-left: 0.95rem;
+}
+
+.calendar-aside-block {
+  margin-bottom: 0.9rem;
+}
+
+.calendar-aside-block:last-child {
+  margin-bottom: 0;
+}
+
+.calendar-aside-block__label {
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(201, 162, 39, 0.92);
+  margin-bottom: 0.55rem;
+}
+
+.dashboard-entry-card__title {
+  font-weight: 720;
+  color: var(--color-complement-bright);
+}
+
+.dashboard-entry-card__actions {
+  margin-top: 0.65rem;
+}
+
+.btn-purple {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(136, 96, 212, 0.55);
+  background: rgba(136, 96, 212, 0.16);
+  color: rgba(215, 199, 255, 0.98) !important;
+  text-decoration: none;
+  font-weight: 750;
+  letter-spacing: -0.01em;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.btn-purple:hover {
+  background: rgba(136, 96, 212, 0.24);
+  border-color: rgba(136, 96, 212, 0.75);
+  transform: translateY(-1px);
+}
+
+.btn-purple--sm {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.82rem;
 }
 
 .modal-backdrop {
@@ -2112,6 +2169,25 @@ a.btn-gold.btn-gold--outline:hover,
   color: var(--color-text);
   font-size: 0.88rem;
   font-weight: 650;
+}
+
+.entry-tag--gold {
+  border-color: rgba(201, 162, 39, 0.42);
+  background: rgba(201, 162, 39, 0.12);
+  color: rgba(236, 206, 112, 0.98);
+}
+
+@media (max-width: 820px) {
+  .calendar-day__row {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-day__aside {
+    border-left: none;
+    padding-left: 0;
+    border-top: 1px solid rgba(201, 162, 39, 0.25);
+    padding-top: 0.85rem;
+  }
 }
 
 /* Entry emotion — 1–10 scale from sentiment_score (-1 … 1) */

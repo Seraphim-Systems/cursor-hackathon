@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getCalendar, getEntry, getPeriodSummary, listEntries } from "../api/client";
-import type { CalendarDay, JournalEntry } from "../api/types";
+import type { CalendarDay, JournalEntry, PeriodSummary } from "../api/types";
 import { DuckMicButton, DuckRecordButton } from "../components/DuckRecordButton";
 import { useAuth } from "../auth/AuthContext";
 import { useJournalRecording } from "../hooks/useJournalRecording";
@@ -104,7 +104,7 @@ function buildMonthGrid(year: number, month1to12: number): Array<{ ymd: string |
   return cells.slice(0, 42);
 }
 
-type ViewMode = "day" | "week" | "month" | "year";
+type ViewMode = "day" | "month" | "year";
 
 export function Dashboard() {
   const { token } = useAuth();
@@ -120,7 +120,7 @@ export function Dashboard() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
 
-  const [daySummary, setDaySummary] = useState<Record<string, string>>({});
+  const [daySummary, setDaySummary] = useState<Record<string, PeriodSummary>>({});
   const [dayEntries, setDayEntries] = useState<Record<string, JournalEntry[]>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("year");
   const [focusedMonth, setFocusedMonth] = useState<number>(() => now.getUTCMonth() + 1);
@@ -224,10 +224,12 @@ export function Dashboard() {
       if (!daySummary[ymd]) {
         try {
           const s = await getPeriodSummary(ymd, ymd, "day");
-          const full = (s.summary || "").trim();
-          setDaySummary((prev) => ({ ...prev, [ymd]: full }));
+          setDaySummary((prev) => ({ ...prev, [ymd]: s }));
         } catch {
-          setDaySummary((prev) => ({ ...prev, [ymd]: "" }));
+          setDaySummary((prev) => ({
+            ...prev,
+            [ymd]: { summary: "", key_achievements: [], top_themes: [], key_people: [] },
+          }));
         }
       }
       if (!dayEntries[ymd]) {
@@ -337,7 +339,7 @@ export function Dashboard() {
 
             <div className="calendar-tree-controls" aria-label="Calendar controls">
               <div className="segmented" role="tablist" aria-label="Calendar view">
-                {(["day", "week", "month", "year"] as ViewMode[]).map((m) => (
+                {(["day", "month", "year"] as ViewMode[]).map((m) => (
                   <button
                     key={m}
                     type="button"
@@ -397,7 +399,6 @@ export function Dashboard() {
                   <div className="calendar-panel__head">
                     <div className="calendar-panel__title">
                       {viewMode === "month" ? monthLabel(selectedYear, focusedMonth) : null}
-                      {viewMode === "week" ? fmtWeekLabel(focusedWeek.from, focusedWeek.to) : null}
                       {viewMode === "day" ? focusedDay : null}
                     </div>
                     <div className="calendar-panel__nav" aria-label="Calendar navigation">
@@ -456,40 +457,9 @@ export function Dashboard() {
                     </div>
                   ) : null}
 
-                  {viewMode === "week" ? (
-                    <div className="calendar-week" role="grid" aria-label="Week view">
-                      {focusedWeek.days.map((d) => {
-                        const count = d.cal?.count ?? 0;
-                        const isFocused = d.ymd === focusedDay;
-                        return (
-                          <button
-                            key={d.ymd}
-                            type="button"
-                            className={`calendar-weekday ${count > 0 ? "calendar-weekday--has" : ""} ${isFocused ? "calendar-weekday--focused" : ""}`}
-                            onClick={() => {
-                              setFocusedDay(d.ymd);
-                              setViewMode("day");
-                              if (d.cal) void ensureDayDetail(d.cal);
-                            }}
-                          >
-                            <div className="calendar-weekday__label">{fmtMonthDay(parseYmd(d.ymd))}</div>
-                            <div className="calendar-weekday__meta">{count} recordings</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null}
-
                   {viewMode === "day" ? (
                     <div className="calendar-day" role="region" aria-label="Day view">
                       <div className="calendar-day__top">
-                        <button
-                          type="button"
-                          className="calendar-day__to-week"
-                          onClick={() => setViewMode("week")}
-                        >
-                          View week
-                        </button>
                         <button
                           type="button"
                           className="calendar-day__to-month"
@@ -499,27 +469,59 @@ export function Dashboard() {
                         </button>
                       </div>
 
-                      <p className="calendar-day__summary" title={daySummary[focusedDay] || ""}>
-                        {daySummary[focusedDay]
-                          ? daySummary[focusedDay]
-                          : (() => {
-                              const cal = dayByYmd.get(focusedDay);
-                              return cal && cal.count > 0 ? "Loading summary…" : "No entries for this day.";
-                            })()}
-                      </p>
+                      <div className="calendar-day__row">
+                        <div className="calendar-day__main">
+                          <p className="calendar-day__summary" title={daySummary[focusedDay]?.summary || ""}>
+                            {daySummary[focusedDay]?.summary
+                              ? daySummary[focusedDay]?.summary
+                              : (() => {
+                                  const cal = dayByYmd.get(focusedDay);
+                                  return cal && cal.count > 0 ? "Loading summary…" : "No entries for this day.";
+                                })()}
+                          </p>
+                        </div>
+
+                        <aside className="calendar-day__aside" aria-label="Key people and themes">
+                          <div className="calendar-aside-block">
+                            <div className="calendar-aside-block__label">Key people</div>
+                            {daySummary[focusedDay]?.key_people?.length ? (
+                              <div className="entry-tags entry-tags--gold">
+                                {daySummary[focusedDay].key_people.map((p) => (
+                                  <span key={p} className="entry-tag entry-tag--gold">
+                                    {p}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="muted">(None)</div>
+                            )}
+                          </div>
+
+                          <div className="calendar-aside-block">
+                            <div className="calendar-aside-block__label">Top themes</div>
+                            {daySummary[focusedDay]?.top_themes?.length ? (
+                              <div className="entry-tags entry-tags--gold">
+                                {daySummary[focusedDay].top_themes.map((t) => (
+                                  <span key={t} className="entry-tag entry-tag--gold">
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="muted">(None)</div>
+                            )}
+                          </div>
+                        </aside>
+                      </div>
 
                       {dayEntries[focusedDay] && dayEntries[focusedDay].length > 0 ? (
                         <div className="dashboard-day-entries">
                           {dayEntries[focusedDay].map((e) => (
                             <div key={e.id} className="dashboard-entry-card">
                               <div className="dashboard-entry-card__head">
-                                <button
-                                  type="button"
-                                  className="dashboard-entry-card__link dashboard-entry-card__link--btn"
-                                  onClick={() => setSelectedEntry(e)}
-                                >
+                                <div className="dashboard-entry-card__title">
                                   {e.summary || "(Entry)"}
-                                </button>
+                                </div>
                                 <span className="dashboard-entry-card__meta">
                                   {new Date(e.created_at).toLocaleTimeString([], {
                                     hour: "2-digit",
@@ -530,6 +532,11 @@ export function Dashboard() {
                               <p className="dashboard-entry-card__transcript">
                                 {e.transcript || e.cleaned_text || "(No transcript)"}
                               </p>
+                              <div className="dashboard-entry-card__actions">
+                                <Link to={`/entries/${e.id}`} className="btn-purple btn-purple--sm">
+                                  Open full summary
+                                </Link>
+                              </div>
                             </div>
                           ))}
                         </div>
