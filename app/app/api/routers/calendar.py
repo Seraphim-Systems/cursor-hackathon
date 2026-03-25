@@ -118,10 +118,27 @@ async def _get_or_create_summary(
 
     # 4. Generate new summary
     texts = []
-    for e in entries:
-        t = (e.summary or e.cleaned_text or e.transcript or "").strip()
-        if t:
-            texts.append(t)
+    
+    # Hierarchical context: if summarizing a YEAR, try to use its MONTH summaries first
+    if period_type == "year":
+        month_summaries = await PeriodSummaryDocument.find(
+            PeriodSummaryDocument.user_id == str(user.id),
+            PeriodSummaryDocument.period_type == "month",
+            PeriodSummaryDocument.start_date >= from_.isoformat(),
+            PeriodSummaryDocument.end_date <= to.isoformat()
+        ).to_list()
+        
+        if month_summaries:
+            for ms in month_summaries:
+                texts.append(f"Month: {ms.start_date} to {ms.end_date}\nSummary: {ms.summary}")
+    
+    # Fallback/Default: Use entry-level summaries
+    if not texts:
+        for e in entries:
+            # Prefer summary to keep context window small
+            t = (e.summary or e.cleaned_text or e.transcript or "").strip()
+            if t:
+                texts.append(t)
 
     period_name = f"{period_type} ({from_} to {to})"
     raw_content = await analyze_aggregate(

@@ -1,5 +1,6 @@
-# Load variables from a local `.env` file if present (never commit `.env`).
-# For deployment, inject the same keys from your CI/CD secret store (see docs/DEPLOYMENT.md).
+# Production-ready compose configuration.
+# Services use `expose` instead of `ports` to keep traffic within the Docker network.
+# Only the reverse proxy (not shown) should bind host ports.
 
 services:
   mongo:
@@ -7,8 +8,8 @@ services:
     restart: unless-stopped
     volumes:
       - mongo_data:/data/db
-    ports:
-      - "27017:27017"
+    expose:
+      - "27017"
 
   stt:
     image: onerahmet/openai-whisper-asr-webservice:latest
@@ -19,8 +20,8 @@ services:
       ASR_DEVICE: cpu
     volumes:
       - whisper_cache:/root/.cache
-    ports:
-      - "9000:9000"
+    expose:
+      - "9000"
 
   app:
     build:
@@ -49,8 +50,11 @@ services:
       AI_HTTP_TIMEOUT_SECONDS: ${AI_HTTP_TIMEOUT_SECONDS:-120}
     volumes:
       - audio_uploads:/data/audio
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
+    networks:
+      - default
+      - proxy
     depends_on:
       - mongo
       - stt
@@ -76,7 +80,7 @@ volumes:
   whisper_cache:
 
 networks:
-  # Must exist on the host (for example: `docker network create proxy`).
+  default:
   proxy:
     external: true
     name: ${EXTERNAL_PROXY_NETWORK:-proxy}
