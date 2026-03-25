@@ -90,9 +90,9 @@ jobs:
           cd /home/${{ secrets.INFRA_HETZNER_USER }}/cursor-hackathon
           docker compose ps
           
-          # Basic API Health Check
-          echo "Running health check..."
-          curl -f "http://localhost:8000/api/health" || exit 1
+          # Basic API Health Check - Run INSIDE the container because ports are not bound to host
+          echo "Running health check inside app container..."
+          docker compose exec -T app curl -f "http://localhost:8000/api/health" || exit 1
           ENDSSH
 
       - name: Cleanup
