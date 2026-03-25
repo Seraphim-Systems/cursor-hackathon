@@ -49,12 +49,27 @@ class HttpSttTranscriber:
         files = {self._form_field: (filename, audio_bytes, mime_type or "application/octet-stream")}
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            try:
-                response = await client.post(url, params=params, files=files)
-                response.raise_for_status()
-            except httpx.HTTPError as e:
-                logger.warning("STT request failed: %s", e)
-                raise
+            max_retries = 3
+            last_err = None
+            for attempt in range(max_retries):
+                try:
+                    response = await client.post(url, params=params, files=files)
+                    response.raise_for_status()
+                    break
+                except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                    last_err = e
+                    logger.warning("STT connection failed (attempt %d/%d): %s", attempt + 1, max_retries, e)
+                    if attempt < max_retries - 1:
+                        import asyncio
+                        await asyncio.sleep(2 * (attempt + 1))
+                    else:
+                        raise
+                except httpx.HTTPError as e:
+                    logger.warning("STT request failed: %s", e)
+                    raise
+            else:
+                if last_err:
+                    raise last_err
 
         text = _extract_text(response)
         return TranscriptionResult(text=text)

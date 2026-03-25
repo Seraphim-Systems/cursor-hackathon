@@ -10,7 +10,8 @@ from app.domain.protocols import IAIAnalyzer, IAudioStorage, ITranscriber
 from app.domain.text_utils import compose_cleaned_text
 from app.infrastructure.persistence.documents import JournalEntryDocument, SourceKind
 from app.infrastructure.persistence.project_document import ProjectDocument
-from app.infrastructure.persistence.repositories import JournalEntryRepository, ProjectRepository
+from app.infrastructure.persistence.journal_entry_repository import JournalEntryRepository
+from app.infrastructure.persistence.project_repository import ProjectRepository
 
 
 class JournalFacade:
@@ -98,7 +99,7 @@ class JournalFacade:
         audio_content_type: str | None,
         run_analysis: bool,
     ) -> JournalEntryDocument:
-        entry = await self._entries.get_for_user(entry_id, user_id)
+        entry = await self._entries.get_owned(entry_id, user_id)
         if entry is None:
             raise LookupError("entry not found")
 
@@ -139,7 +140,7 @@ class JournalFacade:
         entry_id: str,
         preserve_locked_fields: bool,
     ) -> JournalEntryDocument:
-        entry = await self._entries.get_for_user(entry_id, user_id)
+        entry = await self._entries.get_owned(entry_id, user_id)
         if entry is None:
             raise LookupError("entry not found")
         body = (entry.cleaned_text or entry.transcript or "").strip()
@@ -177,7 +178,7 @@ class JournalFacade:
             norm = normalized_project_name(name)
             if not norm:
                 continue
-            existing = await self._projects.find_by_normalized(user_id, norm)
+            existing = await self._projects.find_by_user_and_normalized(user_id, norm)
             notes = str(raw.get("notes") or "").strip() or None
             if existing:
                 existing.last_mentioned_at = now
@@ -212,7 +213,7 @@ class JournalFacade:
         insights: dict | None = None,
         insights_field_locks: list[str] | None = None,
     ) -> JournalEntryDocument:
-        entry = await self._entries.get_for_user(entry_id, user_id)
+        entry = await self._entries.get_owned(entry_id, user_id)
         if entry is None:
             raise LookupError("entry not found")
         if cleaned_text is not None:
@@ -234,7 +235,7 @@ class JournalFacade:
         return entry
 
     async def delete_entry(self, *, user_id: str, entry_id: str) -> bool:
-        entry = await self._entries.get_for_user(entry_id, user_id)
+        entry = await self._entries.get_owned(entry_id, user_id)
         if entry is None:
             return False
         if entry.audio_storage_key:

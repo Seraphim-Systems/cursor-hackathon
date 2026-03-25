@@ -13,10 +13,10 @@ from app.infrastructure.adapters.registry import build_analyzer, build_transcrib
 from app.infrastructure.persistence.beanie_app import init_beanie_for_app, mongo_ping_ok
 from app.infrastructure.persistence.documents import (
     JournalEntryDocument,
-    ProjectDocument,
     UserDocument,
     PeriodSummaryDocument,
 )
+from app.infrastructure.persistence.project_document import ProjectDocument
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

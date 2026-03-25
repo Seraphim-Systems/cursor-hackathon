@@ -1,12 +1,12 @@
 import type { UserSettings } from "../types/userSettings";
-import type { CalendarResponse, EntryListResponse, JournalEntry, TokenResponse } from "./types";
+import type { CalendarResponse, EntryListResponse, JournalEntry, TokenResponse, PeriodSummary } from "./types";
 
 export type MeResponse = {
   user: { id: string; email: string; is_admin?: boolean };
   settings: UserSettings;
 };
 
-export type { CalendarResponse, EntryListResponse, JournalEntry, TokenResponse } from "./types";
+export type { CalendarResponse, EntryListResponse, JournalEntry, TokenResponse, PeriodSummary } from "./types";
 
 const TOKEN_KEY = "journal_access_token";
 
@@ -218,6 +218,16 @@ export async function analyzeEntry(
 export async function getCalendar(from: string, to: string): Promise<CalendarResponse> {
   const q = new URLSearchParams({ from, to });
   return apiFetch<CalendarResponse>(`/api/calendar?${q.toString()}`);
+}
+
+export async function getPeriodSummary(from: string, to: string, periodType: string): Promise<PeriodSummary> {
+  const q = new URLSearchParams({ from, to, period_type: periodType });
+  return apiFetch<PeriodSummary>(`/api/calendar/summarize?${q.toString()}`);
+}
+
+export async function refreshPeriodSummary(from: string, to: string, periodType: string): Promise<PeriodSummary> {
+  const q = new URLSearchParams({ from, to, period_type: periodType });
+  return apiFetch<PeriodSummary>(`/api/calendar/summarize?${q.toString()}`, { method: "POST" });
 }
 
 /** GET/PATCH /api/settings — contracts/user-settings.schema.json */

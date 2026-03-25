@@ -47,6 +47,14 @@ export interface CalendarResponse {
   days: CalendarDay[];
 }
 
+export interface PeriodSummary {
+  summary: string;
+  sentiment_trend: string;
+  key_achievements: string[];
+  top_themes: string[];
+  significant_people: string[];
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;

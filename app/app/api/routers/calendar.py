@@ -69,12 +69,12 @@ async def get_calendar(
     )
 
 
-@router.get("/calendar/summarize", response_model=PeriodSummaryResponse)
-async def summarize_period(
+async def _get_or_create_summary(
     user: UserDep,
-    from_: date = Query(..., alias="from"),
-    to: date = Query(...),
-    period_type: str = Query("month", description="year, month, week, or day"),
+    from_: date,
+    to: date,
+    period_type: str,
+    force_refresh: bool = False,
 ) -> PeriodSummaryResponse:
     # 1. Check for cached summary
     cached = await PeriodSummaryDocument.find_one(
@@ -96,8 +96,8 @@ async def summarize_period(
 
     entry_count = len(entries)
 
-    # 2. Use cache if valid (exists and entry count matches)
-    if cached and cached.last_entry_count == entry_count:
+    # 2. Use cache if valid (exists, entry count matches, and not forced)
+    if not force_refresh and cached and cached.last_entry_count == entry_count:
         return PeriodSummaryResponse(
             summary=cached.summary,
             sentiment_trend=cached.sentiment_trend,
@@ -167,3 +167,24 @@ async def summarize_period(
         await new_cached.insert()
 
     return res
+
+
+@router.get("/calendar/summarize", response_model=PeriodSummaryResponse)
+async def summarize_period(
+    user: UserDep,
+    from_: date = Query(..., alias="from"),
+    to: date = Query(...),
+    period_type: str = Query("month", description="year, month, week, or day"),
+) -> PeriodSummaryResponse:
+    return await _get_or_create_summary(user, from_, to, period_type, force_refresh=False)
+
+
+@router.post("/calendar/summarize", response_model=PeriodSummaryResponse)
+async def refresh_summarize_period(
+    user: UserDep,
+    from_: date = Query(..., alias="from"),
+    to: date = Query(...),
+    period_type: str = Query("month", description="year, month, week, or day"),
+) -> PeriodSummaryResponse:
+    """Manually trigger a re-analysis for the given period, bypassing the cache count check."""
+    return await _get_or_create_summary(user, from_, to, period_type, force_refresh=True)

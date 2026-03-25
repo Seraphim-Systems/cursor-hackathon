@@ -4,13 +4,12 @@ from __future__ import annotations
 from beanie import init_beanie as beanie_init
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from app.infrastructure.persistence.documents import JournalEntryDocument, UserDocument
+from app.infrastructure.persistence.documents import JournalEntryDocument, UserDocument, PeriodSummaryDocument
 from app.infrastructure.persistence.project_document import ProjectDocument
 
 from app.config import settings
-from app.infrastructure.persistence.documents import UserDocument
 
-DOCUMENT_MODELS = [UserDocument, JournalEntryDocument, ProjectDocument]
+DOCUMENT_MODELS = [UserDocument, JournalEntryDocument, ProjectDocument, PeriodSummaryDocument]
 
 async def init_beanie(
     client: AsyncIOMotorClient,
@@ -22,7 +21,7 @@ async def init_beanie(
     db = database_name or settings.mongodb_db_name
     await beanie_init(
         database=client[db],
-        document_models=[UserDocument],
+        document_models=DOCUMENT_MODELS,
     )
 
 

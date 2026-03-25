@@ -9,10 +9,10 @@ import pytest
 from app.application.facades.auth_facade import AuthFacade
 from app.application.facades.journal_facade import JournalFacade
 from app.domain.protocols import AnalysisResult, TranscriptionResult
-from app.infrastructure.persistence.documents import ProjectDocument
+from app.infrastructure.persistence.project_document import ProjectDocument
+from app.infrastructure.persistence.journal_entry_repository import JournalEntryRepository
+from app.infrastructure.persistence.project_repository import ProjectRepository
 from app.infrastructure.persistence.repositories import (
-    JournalEntryRepository,
-    ProjectRepository,
     UserRepository,
 )
 

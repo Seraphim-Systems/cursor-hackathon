@@ -1,20 +1,7 @@
 import { useEffect, useState } from "react";
-import { apiFetch } from "../api/client";
+import { getCalendar, getPeriodSummary, refreshPeriodSummary } from "../api/client";
 import { Link } from "react-router-dom";
-
-type PeriodSummary = {
-  summary: string;
-  sentiment_trend: string;
-  key_achievements: string[];
-  top_themes: string[];
-  significant_people: string[];
-};
-
-type CalendarDay = {
-  date: string;
-  count: number;
-  entry_ids: string[];
-};
+import type { CalendarDay, PeriodSummary } from "../api/types";
 
 export default function CalendarPage() {
   const [view, setView] = useState<"year" | "month" | "week" | "day">("year");
@@ -25,16 +12,14 @@ export default function CalendarPage() {
 
   const [summary, setSummary] = useState<PeriodSummary | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
 
   useEffect(() => {
     fetchSummary();
   }, [view, selectedYear, selectedMonth, selectedWeekStart, selectedDay]);
 
-  const fetchSummary = async () => {
-    setLoadingSummary(true);
-    setSummary(null);
-
+  const getPeriodParams = () => {
     let from: string, to: string, type: string;
 
     if (view === "year") {
@@ -57,23 +42,47 @@ export default function CalendarPage() {
       to = selectedDay;
       type = "day";
     } else {
-      setLoadingSummary(false);
-      return;
+      return null;
     }
+    return { from, to, type };
+  };
+
+  const fetchSummary = async () => {
+    const params = getPeriodParams();
+    if (!params) return;
+
+    setLoadingSummary(true);
+    setSummary(null);
 
     try {
-      const data = await apiFetch<PeriodSummary>(`/api/calendar/summarize?from=${from}&to=${to}&period_type=${type}`);
+      const data = await getPeriodSummary(params.from, params.to, params.type);
       setSummary(data);
       
       // Also fetch calendar dots if in year/month view
       if (view === "year" || view === "month") {
-        const cal = await apiFetch<{ days: CalendarDay[] }>(`/api/calendar?from=${from}&to=${to}`);
+        const cal = await getCalendar(params.from, params.to);
         setCalendarData(cal.days);
       }
     } catch (err) {
       console.error(err);
     } finally {
       setLoadingSummary(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    const params = getPeriodParams();
+    if (!params) return;
+
+    setRefreshing(true);
+    try {
+      const data = await refreshPeriodSummary(params.from, params.to, params.type);
+      setSummary(data);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to refresh summary. Please try again later.");
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -209,13 +218,37 @@ export default function CalendarPage() {
 
       {/* Summary Section */}
       <section style={{ padding: "2rem", border: `2px solid ${colors.gold}`, borderRadius: "12px", background: colors.purpleLight }}>
-        <h3 style={{ marginTop: 0, color: colors.purple }}>
-          {loadingSummary ? "Generating AI Insights..." : (
-            view === "year" ? `${selectedYear} Yearly Summary` :
-            view === "month" ? `${months[selectedMonth-1]} ${selectedYear} Summary` :
-            view === "day" ? `${selectedDay} Daily Summary` : "Summary"
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
+          <h3 style={{ marginTop: 0, color: colors.purple }}>
+            {loadingSummary ? "Generating AI Insights..." : (
+              view === "year" ? `${selectedYear} Yearly Summary` :
+              view === "month" ? `${months[selectedMonth-1]} ${selectedYear} Summary` :
+              view === "day" ? `${selectedDay} Daily Summary` : "Summary"
+            )}
+          </h3>
+          {summary && !loadingSummary && (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              style={{
+                padding: "0.4rem 0.8rem",
+                borderRadius: "4px",
+                border: `1px solid ${colors.purple}`,
+                background: colors.white,
+                color: colors.purple,
+                fontSize: "0.85rem",
+                fontWeight: "bold",
+                cursor: refreshing ? "not-allowed" : "pointer",
+                opacity: refreshing ? 0.7 : 1,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem"
+              }}
+            >
+              {refreshing ? "Refreshing..." : "↻ Refresh AI Summary"}
+            </button>
           )}
-        </h3>
+        </div>
 
         {summary ? (
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "2rem" }}>

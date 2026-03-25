@@ -63,25 +63,6 @@ class JournalEntryDocument(Document):
         ]
 
 
-class ProjectDocument(Document):
-    """Project resource."""
-
-    user_id: str
-    name: str
-    normalized_name: str = ""
-    description: str = ""
-    active: bool = True
-    last_mentioned_at: datetime | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-    class Settings:
-        name = "projects"
-        indexes = [
-            IndexModel([("user_id", ASCENDING)]),
-            IndexModel([("user_id", ASCENDING), ("normalized_name", ASCENDING)]),
-        ]
-
-
 class PeriodSummaryDocument(Document):
     """Cached AI summary for a specific time period (Year, Month, Week, or Day)."""
 

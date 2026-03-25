@@ -8,9 +8,10 @@ from beanie import PydanticObjectId
 from app.infrastructure.persistence.documents import (
     InsightsEmbedded,
     JournalEntryDocument,
-    ProjectDocument,
     UserDocument,
+    PeriodSummaryDocument,
 )
+from app.infrastructure.persistence.project_document import ProjectDocument
 from app.schemas.user_settings import UserSettings
 
 
