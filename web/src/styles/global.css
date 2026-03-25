@@ -1763,6 +1763,15 @@ a.btn-gold.btn-gold--outline:hover,
   line-height: 1.5;
 }
 
+.calendar-day__summary-label {
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(201, 162, 39, 0.92);
+  margin-bottom: 0.55rem;
+}
+
 .calendar-day__row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
@@ -1800,6 +1809,23 @@ a.btn-gold.btn-gold--outline:hover,
 .dashboard-entry-card__title {
   font-weight: 720;
   color: var(--color-complement-bright);
+}
+
+.dashboard-entry-card__label {
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(201, 162, 39, 0.92);
+  margin-top: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.dashboard-entry-card__summary {
+  margin: 0.35rem 0 0;
+  color: rgba(215, 199, 255, 0.98);
+  font-weight: 700;
+  line-height: 1.45;
 }
 
 .dashboard-entry-card__actions {

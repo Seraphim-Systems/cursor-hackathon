@@ -402,18 +402,9 @@ export function Dashboard() {
 
                   {viewMode === "day" ? (
                     <div className="calendar-day" role="region" aria-label="Day view">
-                      <div className="calendar-day__top">
-                        <button
-                          type="button"
-                          className="calendar-day__to-month"
-                          onClick={() => setViewMode("month")}
-                        >
-                          View month
-                        </button>
-                      </div>
-
                       <div className="calendar-day__row">
                         <div className="calendar-day__main">
+                          <div className="calendar-day__summary-label">Daily summary</div>
                           <p className="calendar-day__summary" title={daySummary[focusedDay]?.summary || ""}>
                             {daySummary[focusedDay]?.summary
                               ? daySummary[focusedDay]?.summary
@@ -462,9 +453,7 @@ export function Dashboard() {
                           {dayEntries[focusedDay].map((e) => (
                             <div key={e.id} className="dashboard-entry-card">
                               <div className="dashboard-entry-card__head">
-                                <div className="dashboard-entry-card__title">
-                                  {e.summary || "(Entry)"}
-                                </div>
+                                <div className="dashboard-entry-card__title">Entry summary</div>
                                 <span className="dashboard-entry-card__meta">
                                   {new Date(e.created_at).toLocaleTimeString([], {
                                     hour: "2-digit",
@@ -472,6 +461,10 @@ export function Dashboard() {
                                   })}
                                 </span>
                               </div>
+                              <p className="dashboard-entry-card__summary">
+                                {e.summary || "(No summary yet)"}
+                              </p>
+                              <div className="dashboard-entry-card__label">Transcript</div>
                               <p className="dashboard-entry-card__transcript">
                                 {e.transcript || e.cleaned_text || "(No transcript)"}
                               </p>
