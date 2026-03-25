@@ -1,9 +1,6 @@
 name: Deploy Journal App
 
 on:
-  push:
-    branches:
-      - main  # Adjust this to your production/main branch
   workflow_dispatch:
 
 jobs:
@@ -42,7 +39,7 @@ jobs:
             # Update remote URL to include token for subsequent fetches
             git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             git fetch origin
-            git reset --hard origin/main
+            git reset --hard origin/${{ github.ref_name }}
             git clean -fd
           fi
           ENDSSH
