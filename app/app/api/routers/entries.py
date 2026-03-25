@@ -6,7 +6,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import UserDep, get_analyzer, get_audio_storage, get_transcriber
@@ -98,11 +108,15 @@ async def create_entry(
 ) -> JournalEntryOut:
     """Create an entry from JSON or multipart (optional `audio` part per DATA_CONTRACTS §Entries)."""
     user_id = str(user.id)
-    content_type = (request.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    content_type = (
+        (request.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    )
 
     if content_type == "application/json":
         body = JournalEntryCreateBody.model_validate(await request.json())
-        insights_dict = body.insights.model_dump() if body.insights is not None else None
+        insights_dict = (
+            body.insights.model_dump() if body.insights is not None else None
+        )
         doc = await repo.create(
             user_id=user_id,
             source=body.source,
@@ -136,7 +150,9 @@ async def create_entry(
             ct_val = form.get("cleaned_text")
             cleaned = (
                 str(ct_val).strip()
-                if ct_val is not None and isinstance(ct_val, str) and str(ct_val).strip()
+                if ct_val is not None
+                and isinstance(ct_val, str)
+                and str(ct_val).strip()
                 else None
             )
             raw_run = form.get("run_analysis")
@@ -192,7 +208,9 @@ async def create_entry(
                 ) from e
             transcript_val = t_result.text
 
-        insights_dict = body.insights.model_dump() if body.insights is not None else None
+        insights_dict = (
+            body.insights.model_dump() if body.insights is not None else None
+        )
         doc = await repo.create(
             user_id=user_id,
             source=resolved_source,
@@ -219,6 +237,51 @@ async def create_entry(
     )
 
 
+@router.get("/trends/summary")
+async def get_trends_summary(
+    user: UserDep,
+    repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
+    analyzer: Annotated[IAIAnalyzer, Depends(get_analyzer)],
+) -> dict:
+    """Analyze the last 50 entries to find long-term patterns and connections."""
+    user_id = str(user.id)
+    items, _ = await repo.list_for_user(
+        user_id=user_id,
+        limit=50,
+        skip=0,
+        created_from=None,
+        created_to=None,
+    )
+
+    if not items:
+        return {
+            "summary": "No entries found to analyze.",
+            "findings": [],
+            "beneficial_actions": [],
+        }
+
+    entries_data = []
+    for e in items:
+        # Use a simplified representation for trend analysis
+        entries_data.append(
+            {
+                "date": e.created_at.isoformat(),
+                "summary": e.summary,
+                "themes": e.insights.themes,
+                "people": e.insights.people,
+                "key_points": e.insights.key_points,
+            }
+        )
+
+    try:
+        return await analyzer.analyze_trends(entries_data=entries_data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Trend analysis failed: {e}",
+        )
+
+
 @router.get("/{entry_id}/audio")
 async def get_entry_audio(
     entry_id: str,
@@ -229,12 +292,18 @@ async def get_entry_audio(
     """Stream stored audio for the entry owner (same auth as JSON APIs)."""
     entry = await repo.get_owned(entry_id, str(user.id))
     if entry is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found"
+        )
     if not entry.audio_storage_key:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No audio for this entry")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No audio for this entry"
+        )
     data = await storage.read_bytes(entry.audio_storage_key)
     if data is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file missing")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Audio file missing"
+        )
     media = _audio_media_type_for_storage_key(entry.audio_storage_key)
     return Response(content=data, media_type=media)
 
@@ -247,7 +316,9 @@ async def get_entry(
 ) -> JournalEntryOut:
     doc = await repo.get_owned(entry_id, str(user.id))
     if doc is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found"
+        )
     return journal_entry_to_out(doc)
 
 
@@ -261,7 +332,9 @@ async def patch_entry(
     user_id = str(user.id)
     entry = await repo.get_owned(entry_id, user_id)
     if entry is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found"
+        )
 
     patch_data = body.model_dump(exclude_unset=True)
     insight_patch = {k: patch_data[k] for k in _INSIGHT_PATCH_KEYS if k in patch_data}
@@ -305,7 +378,9 @@ async def delete_entry(
 ) -> None:
     deleted = await repo.delete_owned(entry_id, str(user.id))
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found"
+        )
 
 
 @router.post("/{entry_id}/analyze")
@@ -319,7 +394,9 @@ async def analyze_entry(
     """Re-run structured analysis; locked paths keep prior values (see DATA_CONTRACTS §Insights)."""
     entry = await repo.get_owned(entry_id, str(user.id))
     if entry is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found"
+        )
     updated = await reanalyze_journal_entry(
         entry=entry,
         preserve_locked_fields=body.preserve_locked_fields,
@@ -341,7 +418,9 @@ async def upload_entry_audio(
     user_id = str(user.id)
     entry = await repo.get_owned(entry_id, user_id)
     if entry is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found"
+        )
 
     data = await audio.read()
     if not data:
