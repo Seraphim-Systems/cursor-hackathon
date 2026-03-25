@@ -108,8 +108,8 @@ export default function GraphPage() {
                 <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
                   <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--color-success)" }}></div> Positive Impact
                 </span>
-                <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--color-error)" }}></div> Negative Impact
+                <span style={{ display: "flex", alignItems: "center", gap: "0.25rem", color: "var(--color-text)" }}>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--color-danger)" }}></div> Negative Impact
                 </span>
               </div>
             </div>
@@ -212,7 +212,7 @@ export default function GraphPage() {
                             const isPositive = f.impact > 0;
                             const offset = (fi + 1) * 30;
                             const fy = isPositive ? y - offset : y + offset;
-                            const color = isPositive ? "var(--color-success)" : "var(--color-error)" ;
+                            const color = isPositive ? "var(--color-success)" : "var(--color-danger)" ;
                             
                             return (
                               <g key={fi} className="impact-bubble">
