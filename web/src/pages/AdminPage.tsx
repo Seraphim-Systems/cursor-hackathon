@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { apiFetch, createEntryWithAudioProgress } from "../api/client";
 
 type AdminDashboardData = {
