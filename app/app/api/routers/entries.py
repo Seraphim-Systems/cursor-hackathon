@@ -279,7 +279,7 @@ async def get_trends_summary(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Trend analysis failed: {e}",
-        )
+        ) from e
 
 
 @router.get("/{entry_id}/audio")

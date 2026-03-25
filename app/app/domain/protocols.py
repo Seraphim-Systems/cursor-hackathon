@@ -1,8 +1,10 @@
 """Outbound port protocols — implemented by infrastructure adapters."""
 
+from __future__ import annotations
+
 from typing import Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class TranscriptionResult(BaseModel):
@@ -11,6 +13,7 @@ class TranscriptionResult(BaseModel):
 
 class AnalysisResult(BaseModel):
     summary: str | None
+    sentiment_score: float | None = None
     key_points: list[str]
     projects: list[dict]
     goals: list[str]
@@ -18,6 +21,7 @@ class AnalysisResult(BaseModel):
     people: list[str]
     priorities: list[str]
     themes: list[str]
+    impactful_factors: list[dict] = Field(default_factory=list)
 
 
 class IAudioStorage(Protocol):
@@ -29,7 +33,9 @@ class IAudioStorage(Protocol):
 
 
 class ITranscriber(Protocol):
-    async def transcribe(self, *, audio_bytes: bytes, mime_type: str | None) -> TranscriptionResult: ...
+    async def transcribe(
+        self, *, audio_bytes: bytes, mime_type: str | None
+    ) -> TranscriptionResult: ...
 
 
 class IAIAnalyzer(Protocol):

@@ -11,13 +11,14 @@ from typing import Any
 import httpx
 
 from app.domain.ai_payload import AIAnalysisPayload
-from app.domain.protocols import AnalysisResult, IAIAnalyzer
+from app.domain.protocols import AnalysisResult
 
 logger = logging.getLogger(__name__)
 
 ANALYSIS_JSON_INSTRUCTIONS = """You analyze private journal entries. Return one JSON object only, no markdown.
 Keys (use null only where truly unknown):
 - summary: string, short paragraph
+- sentiment_score: number in [-1, 1]
 - key_points: string array
 - projects: array of { "name": string, "notes": string } for work/themes mentioned
 - goals: string array
@@ -25,6 +26,7 @@ Keys (use null only where truly unknown):
 - people: string array (always use specific names if mentioned; avoid generic "friends" or "family")
 - priorities: string array
 - themes: string array (thematic labels)
+- impactful_factors: array of { "name": string, "impact": number, "type": string }
 
 Be concise. Focus on topics, themes, and specific people. Avoid generic labels; if a specific name is mentioned, use it.
 If the entry is empty or noise, still return valid JSON with empty arrays and a short summary."""
@@ -72,11 +74,7 @@ class OpenAiCompatAnalyzer:
                 raise
 
         data = response.json()
-        content = (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         if not isinstance(content, str) or not content.strip():
             raise ValueError("AI response missing message content")
 
@@ -94,7 +92,7 @@ class OpenAiCompatAnalyzer:
 
     async def analyze_trends(self, *, entries_data: list[dict]) -> dict:
         url = f"{self._base}/chat/completions"
-        system_msg = """You analyze multiple journal entry insights to find long-term patterns and connections. 
+        system_msg = """You analyze multiple journal entry insights to find long-term patterns and connections.
 Identify recurring topics, themes, and people.
 Return one JSON object only:
 - summary: string, high-level overview of discovered patterns
@@ -127,11 +125,7 @@ Return one JSON object only:
                 raise
 
         data = response.json()
-        content = (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
         try:
             return json.loads(content)
         except json.JSONDecodeError as e:
@@ -140,7 +134,12 @@ Return one JSON object only:
 
 def _payload_to_result(p: AIAnalysisPayload) -> AnalysisResult:
     return AnalysisResult(
-        summary=(p.summary.strip() if isinstance(p.summary, str) and p.summary.strip() else None),
+        summary=(
+            p.summary.strip()
+            if isinstance(p.summary, str) and p.summary.strip()
+            else None
+        ),
+        sentiment_score=p.sentiment_score,
         key_points=list(p.key_points),
         projects=[{"name": x.name, "notes": x.notes} for x in p.projects],
         goals=list(p.goals),
@@ -148,4 +147,8 @@ def _payload_to_result(p: AIAnalysisPayload) -> AnalysisResult:
         people=list(p.people),
         priorities=list(p.priorities),
         themes=list(p.themes),
+        impactful_factors=[
+            {"name": x.name, "impact": x.impact, "type": x.factor_type}
+            for x in p.impactful_factors
+        ],
     )
