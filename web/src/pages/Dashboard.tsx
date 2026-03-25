@@ -16,7 +16,7 @@ function previewText(entry: JournalEntry): string {
     if (c) return c;
     const t = entry.transcript?.trim();
     if (t) return t;
-    return "(No text yet)";
+    return "(No text)";
   };
   return pick().replace(/\s+/g, " ").trim();
 }

@@ -129,7 +129,7 @@ export function EntryDetailPage() {
         {transcription ? (
           <p className="entry-detail-block__body">{transcription}</p>
         ) : (
-          <p className="entry-detail-block__empty">None</p>
+          <p className="entry-detail-block__empty">(No text)</p>
         )}
       </section>
 
@@ -138,7 +138,7 @@ export function EntryDetailPage() {
         {summaryText ? (
           <p className="entry-detail-block__body">{summaryText}</p>
         ) : (
-          <p className="entry-detail-block__empty">None</p>
+          <p className="entry-detail-block__empty">(No text)</p>
         )}
       </section>
 

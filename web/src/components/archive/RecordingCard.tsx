@@ -12,10 +12,10 @@ function firstLine(text: string | null | undefined, max = 80): string {
 
 function recordingTitle(entry: JournalEntry): string {
   const s = entry.summary?.trim();
-  if (s) return firstLine(s, 100) || "Note";
+  if (s) return firstLine(s, 100) || "(No text)";
   const t = entry.transcript?.trim() || entry.cleaned_text?.trim();
-  if (t) return firstLine(t, 100) || "Voice note";
-  return "Voice note";
+  if (t) return firstLine(t, 100) || "(No text)";
+  return "(No text)";
 }
 
 function recordingPreview(entry: JournalEntry): string | null {

@@ -52,12 +52,18 @@ function entryMatchesQuery(entry: JournalEntry, q: string): boolean {
   return tokens.every((t) => hay.includes(t));
 }
 
-function entryHasTranscript(entry: JournalEntry): boolean {
-  return Boolean(entry.transcript?.trim() || entry.cleaned_text?.trim());
+/** Summary, transcript, or cleaned text (matches list preview “has text”). */
+function entryHasDisplayText(entry: JournalEntry): boolean {
+  return Boolean(
+    entry.summary?.trim() || entry.cleaned_text?.trim() || entry.transcript?.trim(),
+  );
 }
 
-function entryHasKeyPoints(entry: JournalEntry): boolean {
-  return Array.isArray(entry.insights?.key_points) && entry.insights.key_points.length > 0;
+/** Matches dashboard / card preview: no summary, cleaned text, or transcript. */
+function entryHasNoDisplayText(entry: JournalEntry): boolean {
+  return (
+    !entry.summary?.trim() && !entry.cleaned_text?.trim() && !entry.transcript?.trim()
+  );
 }
 
 export function HistoryPage() {
@@ -70,10 +76,9 @@ export function HistoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [audioOnly, setAudioOnly] = useState(false);
-  const [requireTranscript, setRequireTranscript] = useState(false);
+  const [requireHasText, setRequireHasText] = useState(false);
   const [requireSummary, setRequireSummary] = useState(false);
-  const [requireKeyPoints, setRequireKeyPoints] = useState(false);
+  const [requireWithoutText, setRequireWithoutText] = useState(false);
 
   const searchNorm = searchQuery.trim().toLowerCase();
 
@@ -97,17 +102,14 @@ export function HistoryPage() {
     if (rangeTo) {
       list = list.filter((e) => entryCreatedYmd(e.created_at, timeZone) <= rangeTo);
     }
-    if (audioOnly) {
-      list = list.filter((e) => Boolean(e.audio_storage_key));
-    }
-    if (requireTranscript) {
-      list = list.filter(entryHasTranscript);
+    if (requireHasText) {
+      list = list.filter(entryHasDisplayText);
     }
     if (requireSummary) {
       list = list.filter((e) => Boolean(e.summary?.trim()));
     }
-    if (requireKeyPoints) {
-      list = list.filter(entryHasKeyPoints);
+    if (requireWithoutText) {
+      list = list.filter(entryHasNoDisplayText);
     }
     return list;
   }, [
@@ -116,10 +118,9 @@ export function HistoryPage() {
     rangeFrom,
     rangeTo,
     timeZone,
-    audioOnly,
-    requireTranscript,
+    requireHasText,
     requireSummary,
-    requireKeyPoints,
+    requireWithoutText,
   ]);
 
   const sections = useMemo(
@@ -128,12 +129,11 @@ export function HistoryPage() {
   );
 
   const modalFiltersActive =
-    Boolean(rangeFrom || rangeTo) || audioOnly || requireTranscript || requireSummary || requireKeyPoints;
+    Boolean(rangeFrom || rangeTo) || requireHasText || requireSummary || requireWithoutText;
 
   const filtersActive = searchNorm.length > 0 || modalFiltersActive;
 
-  const contentModalFiltersActive =
-    audioOnly || requireTranscript || requireSummary || requireKeyPoints;
+  const contentModalFiltersActive = requireHasText || requireSummary || requireWithoutText;
 
   /** One-sided date → treat like an open range; keep days packed. */
   const partialDateRange = Boolean((rangeFrom && !rangeTo) || (!rangeFrom && rangeTo));
@@ -223,10 +223,9 @@ export function HistoryPage() {
     setSearchQuery("");
     setDateFrom("");
     setDateTo("");
-    setAudioOnly(false);
-    setRequireTranscript(false);
+    setRequireHasText(false);
     setRequireSummary(false);
-    setRequireKeyPoints(false);
+    setRequireWithoutText(false);
     setOpenDayKeys(new Set());
   }, []);
 
@@ -415,17 +414,16 @@ export function HistoryPage() {
 
               <div className="history-filters__section-label history-filters__section-label--spaced">Content</div>
               <div className="history-filters__checks">
-                <label className="history-filters__check">
-                  <input type="checkbox" checked={audioOnly} onChange={(ev) => setAudioOnly(ev.target.checked)} />
-                  <span>Has recording</span>
-                </label>
-                <label className="history-filters__check">
+                <label
+                  className="history-filters__check"
+                  title="Has summary, transcript, or cleaned text"
+                >
                   <input
                     type="checkbox"
-                    checked={requireTranscript}
-                    onChange={(ev) => setRequireTranscript(ev.target.checked)}
+                    checked={requireHasText}
+                    onChange={(ev) => setRequireHasText(ev.target.checked)}
                   />
-                  <span>Has transcript</span>
+                  <span>Has text</span>
                 </label>
                 <label className="history-filters__check">
                   <input
@@ -435,13 +433,16 @@ export function HistoryPage() {
                   />
                   <span>Has summary</span>
                 </label>
-                <label className="history-filters__check">
+                <label
+                  className="history-filters__check"
+                  title="No summary, transcript, or cleaned text"
+                >
                   <input
                     type="checkbox"
-                    checked={requireKeyPoints}
-                    onChange={(ev) => setRequireKeyPoints(ev.target.checked)}
+                    checked={requireWithoutText}
+                    onChange={(ev) => setRequireWithoutText(ev.target.checked)}
                   />
-                  <span>Has AI key points</span>
+                  <span>Without text</span>
                 </label>
               </div>
 
