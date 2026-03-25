@@ -69,13 +69,42 @@ function addDays(ymd: string, n: number): string {
   return isoDateYmd(d);
 }
 
-type WeekNode = {
-  key: string; // from..to
-  from: string;
-  to: string;
-  count: number;
-  days: CalendarDay[];
-};
+function monthStartYmd(year: number, month1to12: number): string {
+  return `${year}-${String(month1to12).padStart(2, "0")}-01`;
+}
+
+function monthLabel(year: number, month1to12: number): string {
+  return new Date(Date.UTC(year, month1to12 - 1, 1)).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function dayOfWeekMon0(d: Date): number {
+  // Monday=0 ... Sunday=6
+  return (d.getUTCDay() + 6) % 7;
+}
+
+function buildMonthGrid(year: number, month1to12: number): Array<{ ymd: string | null; day: number | null }> {
+  const first = new Date(Date.UTC(year, month1to12 - 1, 1));
+  const last = new Date(Date.UTC(year, month1to12, 0));
+  const daysInMonth = last.getUTCDate();
+  const lead = dayOfWeekMon0(first);
+
+  const cells: Array<{ ymd: string | null; day: number | null }> = [];
+  for (let i = 0; i < lead; i++) cells.push({ ymd: null, day: null });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ymd = isoDateYmd(new Date(Date.UTC(year, month1to12 - 1, d)));
+    cells.push({ ymd, day: d });
+  }
+  while (cells.length % 7 !== 0) cells.push({ ymd: null, day: null });
+  // Cap at 6 weeks like most month views
+  while (cells.length < 42) cells.push({ ymd: null, day: null });
+  return cells.slice(0, 42);
+}
+
+type ViewMode = "day" | "week" | "month" | "year";
 
 export function Dashboard() {
   const { token } = useAuth();
@@ -91,13 +120,12 @@ export function Dashboard() {
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
 
-  const [openMonth, setOpenMonth] = useState<number | null>(null);
-  const [openWeekKey, setOpenWeekKey] = useState<string | null>(null);
-  const [openDayYmd, setOpenDayYmd] = useState<string | null>(null);
-
-  const [weekSummary, setWeekSummary] = useState<Record<string, string>>({});
   const [daySummary, setDaySummary] = useState<Record<string, string>>({});
   const [dayEntries, setDayEntries] = useState<Record<string, JournalEntry[]>>({});
+  const [viewMode, setViewMode] = useState<ViewMode>("year");
+  const [focusedMonth, setFocusedMonth] = useState<number>(() => now.getUTCMonth() + 1);
+  const [focusedDay, setFocusedDay] = useState<string>(() => isoDateYmd(now));
+  const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
 
   const refreshEntries = useCallback(() => {
     if (!token) return;
@@ -139,10 +167,6 @@ export function Dashboard() {
     setCalendarLoading(true);
     setYearSummary("");
     setCalendarDays([]);
-    setOpenMonth(null);
-    setOpenWeekKey(null);
-    setOpenDayYmd(null);
-    setWeekSummary({});
     setDaySummary({});
     setDayEntries({});
 
@@ -170,6 +194,12 @@ export function Dashboard() {
     };
   }, [token, selectedYear]);
 
+  const dayByYmd = useMemo(() => {
+    const map = new Map<string, CalendarDay>();
+    for (const d of calendarDays) map.set(d.date, d);
+    return map;
+  }, [calendarDays]);
+
   const monthCounts = useMemo(() => {
     const m: Record<number, number> = {};
     for (let i = 1; i <= 12; i++) m[i] = 0;
@@ -180,40 +210,31 @@ export function Dashboard() {
     return m;
   }, [calendarDays]);
 
-  const monthWeeks = useMemo(() => {
-    if (openMonth == null) return [] as WeekNode[];
-    const mm = String(openMonth).padStart(2, "0");
-    const monthDays = calendarDays
-      .filter((d) => d.date.startsWith(`${selectedYear}-${mm}-`))
-      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-
-    const byWeek: Record<string, WeekNode> = {};
-    for (const day of monthDays) {
-      const ws = weekStartMonday(day.date);
-      const we = addDays(ws, 6);
-      const key = `${ws}..${we}`;
-      if (!byWeek[key]) {
-        byWeek[key] = { key, from: ws, to: we, count: 0, days: [] };
-      }
-      byWeek[key].count += day.count || 0;
-      byWeek[key].days.push(day);
+  const focusedWeek = useMemo(() => {
+    const ws = weekStartMonday(focusedDay);
+    const we = addDays(ws, 6);
+    const days: Array<{ ymd: string; cal: CalendarDay | null }> = [];
+    for (let i = 0; i < 7; i++) {
+      const ymd = addDays(ws, i);
+      days.push({ ymd, cal: dayByYmd.get(ymd) ?? null });
     }
+    return { from: ws, to: we, days };
+  }, [dayByYmd, focusedDay]);
 
-    return Object.values(byWeek).sort((a, b) => (a.from < b.from ? -1 : 1));
-  }, [calendarDays, openMonth, selectedYear]);
+  const focusedMonthGrid = useMemo(() => buildMonthGrid(selectedYear, focusedMonth), [focusedMonth, selectedYear]);
 
-  const ensureWeekSummary = useCallback(
-    async (week: WeekNode) => {
-      if (weekSummary[week.key]) return;
-      try {
-        const s = await getPeriodSummary(week.from, week.to, "week");
-        const full = (s.summary || "").trim();
-        setWeekSummary((prev) => ({ ...prev, [week.key]: full }));
-      } catch {
-        setWeekSummary((prev) => ({ ...prev, [week.key]: "" }));
-      }
+  const navigateMonth = useCallback(
+    (delta: number) => {
+      const idx = focusedMonth - 1 + delta;
+      const yDelta = idx < 0 ? -1 : idx > 11 ? 1 : 0;
+      const nextMonth = ((idx % 12) + 12) % 12 + 1;
+      const nextYear = selectedYear + yDelta;
+      if (years.includes(nextYear)) setSelectedYear(nextYear);
+      setFocusedMonth(nextMonth);
+      setViewMode("month");
+      setFocusedDay(monthStartYmd(nextYear, nextMonth));
     },
-    [weekSummary],
+    [focusedMonth, selectedYear, years],
   );
 
   const ensureDayDetail = useCallback(
@@ -341,6 +362,37 @@ export function Dashboard() {
               Calendar
             </h3>
             <div className="dashboard-calendar__controls">
+              {/* Controls live inside the calendar card (below summary). */}
+            </div>
+          </div>
+
+          <div className="calendar-tree-root" style={{ padding: "0.85rem" }}>
+            <div className="calendar-tree-summary">
+              {calendarLoading ? (
+                <span className="muted">Loading year summary…</span>
+              ) : (
+                <span className="dashboard-year-summary" data-full={yearSummary || ""}>
+                  {yearSummary || "No entries for this year yet."}
+                </span>
+              )}
+            </div>
+
+            <div className="calendar-tree-controls" aria-label="Calendar controls">
+              <div className="segmented" role="tablist" aria-label="Calendar view">
+                {(["day", "week", "month", "year"] as ViewMode[]).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="tab"
+                    aria-selected={viewMode === m}
+                    className={`segmented__btn ${viewMode === m ? "segmented__btn--active" : ""}`}
+                    onClick={() => setViewMode(m)}
+                  >
+                    {m.charAt(0).toUpperCase() + m.slice(1)}
+                  </button>
+                ))}
+              </div>
+
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(Number(e.target.value))}
@@ -354,140 +406,258 @@ export function Dashboard() {
                 ))}
               </select>
             </div>
-          </div>
 
-          <div className="calendar-tree-root" style={{ padding: "0.85rem" }}>
-            <div className="calendar-tree-summary">
-              {calendarLoading ? (
-                <span className="muted">Loading year summary…</span>
-              ) : (
-                <span className="dashboard-year-summary" title={yearSummary || ""}>
-                  {yearSummary || "No entries for this year yet."}
-                </span>
-              )}
-            </div>
+            <div className="calendar-stage" aria-label="Calendar content">
+              {viewMode === "year" ? (
+                <div className="calendar-year" role="list" aria-label="Months">
+                  {MONTHS.map((m, idx) => {
+                    const month = idx + 1;
+                    const count = monthCounts[month] || 0;
+                    const active = focusedMonth === month;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        role="listitem"
+                        className={`calendar-month-card ${active ? "calendar-month-card--active" : ""}`}
+                        onClick={() => {
+                          setFocusedMonth(month);
+                          setFocusedDay(monthStartYmd(selectedYear, month));
+                          setViewMode("month");
+                        }}
+                      >
+                        <div className="calendar-month-card__title">{m}</div>
+                        <div className="calendar-month-card__meta">{count} recordings</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
 
-            <div className="dashboard-month-grid" role="list" aria-label="Months">
-              {MONTHS.map((m, idx) => {
-                const month = idx + 1;
-                const count = monthCounts[month] || 0;
-                const isOpen = openMonth === month;
-                return (
-                  <div key={m} role="listitem" className="dashboard-month-node">
-                    <button
-                      type="button"
-                      className="dashboard-month-tile"
-                      onClick={() => {
-                        setOpenDayYmd(null);
-                        setOpenWeekKey(null);
-                        setOpenMonth((prev) => (prev === month ? null : month));
-                      }}
-                      aria-expanded={isOpen}
-                    >
-                      <span className="dashboard-month-tile__name">{m}</span>
-                      <span className="dashboard-month-tile__count">{count} recordings</span>
-                    </button>
-
-                    {isOpen ? (
-                      <div className="dashboard-month-expand" role="region" aria-label={`${m} weeks`}>
-                        {monthWeeks.map((week) => {
-                          const open = openWeekKey === week.key;
-                          const ws = weekSummary[week.key];
-                          return (
-                            <div key={week.key} className="dashboard-week-node">
-                              <button
-                                type="button"
-                                className="dashboard-tree-row"
-                                onClick={() => {
-                                  setOpenDayYmd(null);
-                                  setOpenWeekKey((prev) => (prev === week.key ? null : week.key));
-                                  void ensureWeekSummary(week);
-                                }}
-                                aria-expanded={open}
-                                title={ws || ""}
-                              >
-                                <span className="dashboard-tree-row__label">{fmtWeekLabel(week.from, week.to)}</span>
-                                <span className="dashboard-tree-row__meta">{week.count} recordings</span>
-                              </button>
-
-                              {open ? (
-                                <div className="dashboard-tree-children" role="region" aria-label="Days">
-                                  {week.days.map((d) => {
-                                    const isDayOpen = openDayYmd === d.date;
-                                    const ds = daySummary[d.date];
-                                    const dsPreview = ds ? oneLinePreview(ds, 96) : "";
-                                    return (
-                                      <div key={d.date} className="dashboard-day-node">
-                                        <button
-                                          type="button"
-                                          className="dashboard-tree-row dashboard-tree-row--day"
-                                          onClick={() => {
-                                            setOpenDayYmd((prev) => (prev === d.date ? null : d.date));
-                                            void ensureDayDetail(d);
-                                          }}
-                                          aria-expanded={isDayOpen}
-                                        >
-                                          <span className="dashboard-tree-row__label">
-                                            {fmtMonthDay(parseYmd(d.date))}{" "}
-                                            <span className="dashboard-tree-row__subtle">
-                                              ({d.count} recordings)
-                                            </span>
-                                          </span>
-                                          <span className="dashboard-tree-row__meta">
-                                            {ds ? dsPreview : d.count > 0 ? "Loading summary…" : "No entries"}
-                                          </span>
-                                        </button>
-
-                                        {isDayOpen ? (
-                                          <div className="dashboard-day-detail ui-card">
-                                            <h4 className="dashboard-day-detail__title">
-                                              {d.date}
-                                            </h4>
-                                            <p className="dashboard-day-detail__summary" title={daySummary[d.date] || ""}>
-                                              {daySummary[d.date] || "No summary for this day."}
-                                            </p>
-
-                                            {dayEntries[d.date] && dayEntries[d.date].length > 0 ? (
-                                              <div className="dashboard-day-entries">
-                                                {dayEntries[d.date].map((e) => (
-                                                  <div key={e.id} className="dashboard-entry-card">
-                                                    <div className="dashboard-entry-card__head">
-                                                      <Link to={`/entries/${e.id}`} className="dashboard-entry-card__link">
-                                                        {e.summary || "(Entry)"}
-                                                      </Link>
-                                                      <span className="dashboard-entry-card__meta">
-                                                        {new Date(e.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                                      </span>
-                                                    </div>
-                                                    <p className="dashboard-entry-card__transcript">
-                                                      {e.transcript || e.cleaned_text || "(No transcript)"}
-                                                    </p>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            ) : (
-                                              <p className="muted" style={{ margin: 0 }}>
-                                                {d.count > 0 ? "Loading entries…" : "No entries for this day."}
-                                              </p>
-                                            )}
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : null}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : null}
+              {viewMode !== "year" ? (
+                <div className="calendar-panel ui-card" role="region" aria-label="Calendar panel">
+                  <div className="calendar-panel__head">
+                    <div className="calendar-panel__title">
+                      {viewMode === "month" ? monthLabel(selectedYear, focusedMonth) : null}
+                      {viewMode === "week" ? fmtWeekLabel(focusedWeek.from, focusedWeek.to) : null}
+                      {viewMode === "day" ? focusedDay : null}
+                    </div>
+                    <div className="calendar-panel__nav" aria-label="Calendar navigation">
+                      <button type="button" className="icon-btn" onClick={() => navigateMonth(-1)} aria-label="Previous month">
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => {
+                          const today = new Date();
+                          const y = today.getUTCFullYear();
+                          const m = today.getUTCMonth() + 1;
+                          if (years.includes(y)) setSelectedYear(y);
+                          setFocusedMonth(m);
+                          setFocusedDay(isoDateYmd(today));
+                          setViewMode("day");
+                        }}
+                      >
+                        Today
+                      </button>
+                      <button type="button" className="icon-btn" onClick={() => navigateMonth(1)} aria-label="Next month">
+                        →
+                      </button>
+                    </div>
                   </div>
-                );
-              })}
+
+                  {viewMode === "month" ? (
+                    <div className="calendar-grid" role="grid" aria-label="Month view">
+                      {focusedMonthGrid.map((c, i) => {
+                        const cal = c.ymd ? dayByYmd.get(c.ymd) ?? null : null;
+                        const count = cal?.count ?? 0;
+                        const isToday = c.ymd === isoDateYmd(new Date());
+                        const isFocused = c.ymd === focusedDay;
+                        return (
+                          <button
+                            key={`${c.ymd ?? "x"}-${i}`}
+                            type="button"
+                            className={`calendar-cell ${count > 0 ? "calendar-cell--has" : ""} ${isToday ? "calendar-cell--today" : ""} ${isFocused ? "calendar-cell--focused" : ""}`}
+                            disabled={!c.ymd}
+                            onClick={() => {
+                              if (!c.ymd) return;
+                              setFocusedDay(c.ymd);
+                              setViewMode("day");
+                              const d = dayByYmd.get(c.ymd);
+                              if (d) void ensureDayDetail(d);
+                            }}
+                            role="gridcell"
+                            aria-label={c.ymd ?? "Empty"}
+                          >
+                            <div className="calendar-cell__day">{c.day ?? ""}</div>
+                            <div className="calendar-cell__count">{count > 0 ? `${count}` : ""}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  {viewMode === "week" ? (
+                    <div className="calendar-week" role="grid" aria-label="Week view">
+                      {focusedWeek.days.map((d) => {
+                        const count = d.cal?.count ?? 0;
+                        const isFocused = d.ymd === focusedDay;
+                        return (
+                          <button
+                            key={d.ymd}
+                            type="button"
+                            className={`calendar-weekday ${count > 0 ? "calendar-weekday--has" : ""} ${isFocused ? "calendar-weekday--focused" : ""}`}
+                            onClick={() => {
+                              setFocusedDay(d.ymd);
+                              setViewMode("day");
+                              if (d.cal) void ensureDayDetail(d.cal);
+                            }}
+                          >
+                            <div className="calendar-weekday__label">{fmtMonthDay(parseYmd(d.ymd))}</div>
+                            <div className="calendar-weekday__meta">{count} recordings</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  {viewMode === "day" ? (
+                    <div className="calendar-day" role="region" aria-label="Day view">
+                      <div className="calendar-day__top">
+                        <button
+                          type="button"
+                          className="calendar-day__to-week"
+                          onClick={() => setViewMode("week")}
+                        >
+                          View week
+                        </button>
+                        <button
+                          type="button"
+                          className="calendar-day__to-month"
+                          onClick={() => setViewMode("month")}
+                        >
+                          View month
+                        </button>
+                      </div>
+
+                      <p className="calendar-day__summary" title={daySummary[focusedDay] || ""}>
+                        {daySummary[focusedDay]
+                          ? daySummary[focusedDay]
+                          : (() => {
+                              const cal = dayByYmd.get(focusedDay);
+                              return cal && cal.count > 0 ? "Loading summary…" : "No entries for this day.";
+                            })()}
+                      </p>
+
+                      {dayEntries[focusedDay] && dayEntries[focusedDay].length > 0 ? (
+                        <div className="dashboard-day-entries">
+                          {dayEntries[focusedDay].map((e) => (
+                            <div key={e.id} className="dashboard-entry-card">
+                              <div className="dashboard-entry-card__head">
+                                <button
+                                  type="button"
+                                  className="dashboard-entry-card__link dashboard-entry-card__link--btn"
+                                  onClick={() => setSelectedEntry(e)}
+                                >
+                                  {e.summary || "(Entry)"}
+                                </button>
+                                <span className="dashboard-entry-card__meta">
+                                  {new Date(e.created_at).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              </div>
+                              <p className="dashboard-entry-card__transcript">
+                                {e.transcript || e.cleaned_text || "(No transcript)"}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="muted" style={{ margin: 0 }}>
+                          {dayByYmd.get(focusedDay)?.count ? "Loading entries…" : ""}
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </section>
+      ) : null}
+
+      {selectedEntry ? (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Entry summary"
+          onClick={() => setSelectedEntry(null)}
+        >
+          <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-sheet__head">
+              <div className="modal-sheet__title">Entry</div>
+              <button type="button" className="icon-btn" onClick={() => setSelectedEntry(null)} aria-label="Close">
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-sheet__meta">
+              {new Date(selectedEntry.created_at).toLocaleString()}
+            </div>
+
+            <div className="modal-sheet__section">
+              <div className="modal-sheet__label">Key people</div>
+              {(selectedEntry.insights?.people?.length ?? 0) > 0 ? (
+                <div className="entry-tags">
+                  {selectedEntry.insights.people.map((p) => (
+                    <span key={p} className="entry-tag">
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="muted">(None)</div>
+              )}
+            </div>
+
+            <div className="modal-sheet__section">
+              <div className="modal-sheet__label">Top themes</div>
+              {(selectedEntry.insights?.themes?.length ?? 0) > 0 ? (
+                <div className="entry-tags">
+                  {selectedEntry.insights.themes.map((t) => (
+                    <span key={t} className="entry-tag">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="muted">(None)</div>
+              )}
+            </div>
+
+            <div className="modal-sheet__section">
+              <div className="modal-sheet__label">Summary</div>
+              <div className="modal-sheet__text">{selectedEntry.summary || "No summary yet."}</div>
+            </div>
+
+            <div className="modal-sheet__section">
+              <div className="modal-sheet__label">Transcript</div>
+              <div className="modal-sheet__text modal-sheet__text--mono">
+                {selectedEntry.transcript || selectedEntry.cleaned_text || "No transcript."}
+              </div>
+            </div>
+
+            <div className="modal-sheet__footer">
+              <Link to={`/entries/${selectedEntry.id}`} className="btn-gold btn-gold--outline">
+                Open full page →
+              </Link>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

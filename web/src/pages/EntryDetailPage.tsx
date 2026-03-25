@@ -101,6 +101,8 @@ export function EntryDetailPage() {
 
   const transcription = normalizeProseForDisplay(transcriptionText(entry));
   const summaryText = normalizeProseForDisplay(entry.summary?.trim() ?? "");
+  const keyPeople = (entry.insights?.people ?? []).filter(Boolean);
+  const topThemes = (entry.insights?.themes ?? []).filter(Boolean);
 
   return (
     <div className="page-shell entry-detail-page">
@@ -137,6 +139,36 @@ export function EntryDetailPage() {
           <p className="entry-detail-block__body">{summaryText}</p>
         ) : (
           <p className="entry-detail-block__empty">(No text)</p>
+        )}
+      </section>
+
+      <section className="entry-detail-block" aria-label="Key people">
+        <span className="entry-detail-block__label">Key people</span>
+        {keyPeople.length ? (
+          <div className="entry-tags">
+            {keyPeople.map((p) => (
+              <span key={p} className="entry-tag">
+                {p}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="entry-detail-block__empty">(None)</p>
+        )}
+      </section>
+
+      <section className="entry-detail-block" aria-label="Top themes">
+        <span className="entry-detail-block__label">Top themes</span>
+        {topThemes.length ? (
+          <div className="entry-tags">
+            {topThemes.map((t) => (
+              <span key={t} className="entry-tag">
+                {t}
+              </span>
+            ))}
+          </div>
+        ) : (
+          <p className="entry-detail-block__empty">(None)</p>
         )}
       </section>
     </div>
