@@ -31,6 +31,8 @@ class ProjectItem(BaseModel):
 
 
 class InsightsImpactfulFactorEmbedded(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str
     impact: float
     factor_type: str = Field(alias="type")

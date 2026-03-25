@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from app.application.project_sync import sync_projects_for_entry
 from app.domain.analysis_merge import merge_analysis_into_entry
 from app.domain.entry_insight_merge import is_insight_path_locked
+from app.domain.journal_insights import JournalInsights, journal_insights_to_jsonable
 from app.domain.protocols import IAIAnalyzer
 from app.infrastructure.persistence.documents import InsightsEmbedded, JournalEntryDocument
 from app.infrastructure.persistence.project_repository import ProjectRepository
+
+logger = logging.getLogger(__name__)
 
 
 def _should_sync_projects_after_analyze(
@@ -69,7 +73,13 @@ async def reanalyze_journal_entry(
         entry.summary = text[:150] + ("..." if len(text) > 150 else "")
 
     entry.sentiment_score = sentiment
-    entry.insights = InsightsEmbedded.model_validate(insights_dict or {})
+    # Ensure we use model_dump(mode="json") or similar to handle aliases like 'type'
+    if isinstance(insights_dict, JournalInsights):
+        data = journal_insights_to_jsonable(insights_dict)
+    else:
+        data = insights_dict or {}
+
+    entry.insights = InsightsEmbedded.model_validate(data)
     entry.updated_at = datetime.now(timezone.utc)
     await entry.save()
     if _should_sync_projects_after_analyze(

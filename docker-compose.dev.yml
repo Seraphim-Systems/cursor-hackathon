@@ -8,6 +8,8 @@ services:
     build:
       context: ./app
       dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
     environment:
       JWT_SECRET: ${JWT_SECRET:-dev-secret-not-for-production}
     volumes:

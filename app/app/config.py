@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
     audio_storage_path: str = "/data/audio"
-    cors_origins: str = "http://localhost:5173,http://localhost:80,http://localhost"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:80,http://localhost"
 
     # Admin seeding
     admin_email: str | None = None

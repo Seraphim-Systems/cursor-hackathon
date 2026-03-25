@@ -18,7 +18,7 @@ class AIProjectMention(BaseModel):
 
 class AIImpactfulFactor(BaseModel):
     """Someone or something that significantly impacted happiness/sentiment."""
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     name: str
     impact: float = Field(ge=-1, le=1)

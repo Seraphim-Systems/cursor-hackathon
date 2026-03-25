@@ -20,7 +20,7 @@ class InsightProjectOut(BaseModel):
 
 
 class ImpactfulFactorOut(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     name: str
     impact: float
@@ -75,7 +75,7 @@ def journal_entry_to_out(doc: JournalEntryDocument) -> JournalEntryOut:
     ):
         insights = None
     else:
-        insights = InsightsOut.model_validate(raw.model_dump(mode="json"))
+        insights = InsightsOut.model_validate(raw.model_dump(mode="json", by_alias=True))
     return JournalEntryOut(
         id=str(doc.id),
         user_id=str(doc.user_id),
