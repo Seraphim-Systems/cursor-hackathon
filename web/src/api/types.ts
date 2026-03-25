@@ -49,8 +49,9 @@ export interface CalendarResponse {
 
 export interface PeriodSummary {
   summary: string;
+  key_achievements: string[];
   top_themes: string[];
-  significant_people: string[];
+  key_people: string[];
 }
 
 export interface TokenResponse {

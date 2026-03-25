@@ -15,21 +15,25 @@ AGGREGATE_JSON_INSTRUCTIONS = """You organize a set of journal entries for a spe
 Return one JSON object only, no markdown.
 Keys:
 - summary: string, a neutral summary of what happened in the period (no advice)
+- key_achievements: string array (notable moments; do not give advice)
 - top_themes: string array
-- significant_people: string array
+- key_people: string array
 
-Do not give advice. Do not diagnose emotions. Keep it factual and useful for navigation."""
+Do not give advice. Do not diagnose emotions. Keep it factual and useful for navigation.
+Focus on topics, themes, and specific people. Avoid generic labels like "friends" or "family"; use specific names mentioned in the entries when possible."""
 
 class AggregateAnalysisResult:
     def __init__(
         self,
         summary: str,
+        key_achievements: list[str],
         top_themes: list[str],
-        significant_people: list[str],
+        key_people: list[str],
     ):
         self.summary = summary
+        self.key_achievements = key_achievements
         self.top_themes = top_themes
-        self.significant_people = significant_people
+        self.key_people = key_people
 
 async def analyze_aggregate(
     *,
@@ -42,8 +46,9 @@ async def analyze_aggregate(
     if not texts:
         return {
             "summary": "No entries for this period.",
+            "key_achievements": [],
             "top_themes": [],
-            "significant_people": [],
+            "key_people": [],
         }
 
     combined_text = "\n---\n".join(texts)
@@ -74,6 +79,7 @@ async def analyze_aggregate(
             logger.warning("Aggregate AI analysis failed: %s", e)
             return {
                 "summary": "Error generating summary.",
+                "key_achievements": [],
                 "top_themes": [],
-                "significant_people": [],
+                "key_people": [],
             }

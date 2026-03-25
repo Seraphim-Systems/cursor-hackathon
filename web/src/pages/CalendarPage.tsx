@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
-import { getCalendar, getPeriodSummary, refreshPeriodSummary } from "../api/client";
+import { getCalendar, getPeriodSummary, refreshPeriodSummary, apiFetch } from "../api/client";
 import { Link } from "react-router-dom";
-import type { CalendarDay, PeriodSummary } from "../api/types";
+import type { CalendarDay, PeriodSummary, JournalEntry } from "../api/types";
 
 export default function CalendarPage() {
   const [view, setView] = useState<"year" | "month" | "week" | "day">("year");
@@ -11,6 +11,7 @@ export default function CalendarPage() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const [summary, setSummary] = useState<PeriodSummary | null>(null);
+  const [dayEntries, setDayEntries] = useState<JournalEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [calendarData, setCalendarData] = useState<CalendarDay[]>([]);
@@ -52,7 +53,7 @@ export default function CalendarPage() {
     // but the user wants to ensure calendar days are correctly displayed.
 
     try {
-      const promises: [Promise<PeriodSummary>, Promise<any>?] = [
+      const promises: [Promise<PeriodSummary>, Promise<any>?, Promise<any>?] = [
         getPeriodSummary(params.from, params.to, params.type)
       ];
       
@@ -60,11 +61,21 @@ export default function CalendarPage() {
         promises.push(getCalendar(params.from, params.to));
       }
 
-      const [summaryData, calendarRes] = await Promise.all(promises);
+      if (view === "day" && selectedDay) {
+        // Fetch entries for this day
+        promises.push(apiFetch<{ items: JournalEntry[] }>(`/api/entries?from=${selectedDay}&to=${selectedDay}`));
+      }
+
+      const [summaryData, calendarRes, entriesRes] = await Promise.all(promises);
       
       setSummary(summaryData);
       if (calendarRes) {
         setCalendarData(calendarRes.days);
+      }
+      if (entriesRes) {
+        setDayEntries(entriesRes.items);
+      } else {
+        setDayEntries([]);
       }
     } catch (err) {
       console.error(err);
@@ -243,7 +254,7 @@ export default function CalendarPage() {
           }}>
             <div className="stack-lg">
               <p style={{ fontSize: "1.05rem", lineHeight: "1.6" }}>{summary.summary}</p>
-              
+
               <div>
                 <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Top themes</h4>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
@@ -269,14 +280,23 @@ export default function CalendarPage() {
               </div>
 
               <div>
-                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Significant People</h4>
+                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Key People</h4>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                  {summary.significant_people.map(p => (
+                  {summary.key_people.map(p => (
                     <span key={p} className="calendar-tree-row__meta">
                       {p}
                     </span>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Notable moments</h4>
+                <ul className="stack-lg" style={{ gap: "0.5rem", paddingLeft: "1.2rem", margin: 0 }}>
+                  {summary.key_achievements.map((a, i) => (
+                    <li key={i} style={{ fontSize: "0.95rem" }}>{a}</li>
+                  ))}
+                </ul>
               </div>
             </div>
           </div>
@@ -288,15 +308,42 @@ export default function CalendarPage() {
       </section>
 
       {view === "day" && selectedDay && (
-         <div style={{ textAlign: "center", marginTop: "1rem" }}>
+        <div className="stack-lg">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3 className="section-label" style={{ margin: 0 }}>Entries for {selectedDay}</h3>
             <Link 
               to={`/history?from=${selectedDay}&to=${selectedDay}`}
-              className="btn-gold btn-gold--outline"
-              style={{ fontSize: "0.9rem" }}
+              className="btn-ghost"
+              style={{ fontSize: "0.85rem" }}
             >
-              View all recordings for this day →
+              Manage in History →
             </Link>
-         </div>
+          </div>
+
+          {dayEntries.length > 0 ? (
+            <div className="entry-list">
+              {dayEntries.map(entry => (
+                <Link key={entry.id} to={`/entries/${entry.id}`} className="ui-card" style={{ display: "block", textDecoration: "none" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: "600", color: "var(--color-text)" }}>
+                        {entry.summary || entry.cleaned_text || entry.transcript || "(No text preview)"}
+                      </p>
+                      <time style={{ fontSize: "0.8rem", color: "var(--color-text-muted)" }}>
+                        {new Date(entry.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </time>
+                    </div>
+                    <span className="calendar-tree-row__meta">{entry.source}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state" style={{ padding: "1.5rem" }}>
+              <p style={{ margin: 0 }}>No specific recordings found for this date.</p>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
