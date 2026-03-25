@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getCalendar, getEntry, getPeriodSummary, listEntries } from "../api/client";
-import type { CalendarDay, JournalEntry, PeriodSummary } from "../api/types";
+import { getCalendar, getEntry, getPeriodSummary } from "../api/client";
+import type { CalendarDay, PeriodSummary } from "../api/types";
 import { DuckMicButton, DuckRecordButton } from "../components/DuckRecordButton";
 import { useAuth } from "../auth/AuthContext";
 import { useJournalRecording } from "../hooks/useJournalRecording";
@@ -46,12 +46,6 @@ function parseYmd(ymd: string): Date {
 
 function fmtMonthDay(d: Date): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
-}
-
-function fmtWeekLabel(fromYmd: string, toYmd: string): string {
-  const a = parseYmd(fromYmd);
-  const b = parseYmd(toYmd);
-  return `${fmtMonthDay(a)} – ${fmtMonthDay(b)}`;
 }
 
 function weekStartMonday(ymd: string): string {
@@ -108,9 +102,7 @@ type ViewMode = "day" | "month" | "year";
 
 export function Dashboard() {
   const { token } = useAuth();
-  const [items, setItems] = useState<JournalEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   const now = useMemo(() => new Date(), []);
   const [selectedYear, setSelectedYear] = useState<number>(() => now.getUTCFullYear());
@@ -190,17 +182,6 @@ export function Dashboard() {
     }
     return m;
   }, [calendarDays]);
-
-  const focusedWeek = useMemo(() => {
-    const ws = weekStartMonday(focusedDay);
-    const we = addDays(ws, 6);
-    const days: Array<{ ymd: string; cal: CalendarDay | null }> = [];
-    for (let i = 0; i < 7; i++) {
-      const ymd = addDays(ws, i);
-      days.push({ ymd, cal: dayByYmd.get(ymd) ?? null });
-    }
-    return { from: ws, to: we, days };
-  }, [dayByYmd, focusedDay]);
 
   const focusedMonthGrid = useMemo(() => buildMonthGrid(selectedYear, focusedMonth), [focusedMonth, selectedYear]);
 

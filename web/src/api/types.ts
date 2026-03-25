@@ -7,6 +7,12 @@ export interface ProjectInsightItem {
   notes: string;
 }
 
+export interface ImpactfulFactorInsight {
+  name: string;
+  impact: number;
+  type: string;
+}
+
 export interface Insights {
   key_points: string[];
   projects: ProjectInsightItem[];
@@ -15,6 +21,7 @@ export interface Insights {
   people: string[];
   priorities: string[];
   themes: string[];
+  impactful_factors: ImpactfulFactorInsight[];
 }
 
 export interface JournalEntry {

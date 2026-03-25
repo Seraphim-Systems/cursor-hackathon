@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch, listEntries } from "../api/client";
-import type { JournalEntry } from "../api/types";
-
-type ImpactfulFactor = {
-  name: string;
-  impact: number;
-  type: string;
-};
+import type { JournalEntry, ImpactfulFactorInsight } from "../api/types";
 
 type TrendsSummary = {
   summary: string;
@@ -479,7 +473,7 @@ export default function GraphPage() {
                           </circle>
 
                           {/* Impactful Factors Highlights */}
-                          {factors.map((f, fi) => {
+                          {factors.map((f: ImpactfulFactorInsight, fi: number) => {
                             const isPositive = f.impact > 0;
                             const offset = (fi + 1) * 30;
                             const fy = isPositive ? y - offset : y + offset;
