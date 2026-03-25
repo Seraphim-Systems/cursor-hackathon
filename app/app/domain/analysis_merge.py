@@ -17,6 +17,7 @@ INSIGHT_FIELD_NAMES: tuple[str, ...] = (
     "people",
     "priorities",
     "themes",
+    "impactful_factors",
 )
 
 

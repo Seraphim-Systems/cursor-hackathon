@@ -9,7 +9,8 @@ from httpx import ASGITransport, AsyncClient
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.config import settings
-from app.infrastructure.persistence.documents import JournalEntryDocument, ProjectDocument, UserDocument
+from app.infrastructure.persistence.documents import JournalEntryDocument, UserDocument
+from app.infrastructure.persistence.project_document import ProjectDocument
 from app.main import app
 
 

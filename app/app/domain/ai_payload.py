@@ -16,6 +16,15 @@ class AIProjectMention(BaseModel):
     notes: str = ""
 
 
+class AIImpactfulFactor(BaseModel):
+    """Someone or something that significantly impacted happiness/sentiment."""
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    impact: float = Field(ge=-1, le=1)
+    factor_type: str = Field(alias="type") # 'person', 'topic', 'event'
+
+
 class AIAnalysisPayload(BaseModel):
     """Expected JSON object from the model after `response_format: json_object`."""
 
@@ -30,3 +39,4 @@ class AIAnalysisPayload(BaseModel):
     people: list[str] = Field(default_factory=list)
     priorities: list[str] = Field(default_factory=list)
     themes: list[str] = Field(default_factory=list)
+    impactful_factors: list[AIImpactfulFactor] = Field(default_factory=list)

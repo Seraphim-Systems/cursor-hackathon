@@ -7,7 +7,7 @@ Lock paths (examples): `summary`, `sentiment_score`, `insights`, or granular
 from __future__ import annotations
 
 from app.domain.protocols import AnalysisResult
-from app.infrastructure.persistence.documents import InsightsEmbedded, JournalEntryDocument, ProjectItem
+from app.infrastructure.persistence.documents import InsightsEmbedded, JournalEntryDocument, ProjectItem, InsightsImpactfulFactorEmbedded
 
 
 INSIGHT_SUBKEYS = (
@@ -18,6 +18,7 @@ INSIGHT_SUBKEYS = (
     "people",
     "priorities",
     "themes",
+    "impactful_factors",
 )
 
 
@@ -37,6 +38,17 @@ def analysis_result_to_insights_embedded(result: AnalysisResult) -> InsightsEmbe
         elif isinstance(p, str) and p.strip():
             projects.append(ProjectItem(name=p.strip(), notes=""))
 
+    factors = []
+    for f in result.impactful_factors:
+        if isinstance(f, dict):
+            factors.append(
+                InsightsImpactfulFactorEmbedded(
+                    name=str(f.get("name", "")),
+                    impact=float(f.get("impact", 0)),
+                    type=str(f.get("type", "topic"))
+                )
+            )
+
     return InsightsEmbedded(
         key_points=list(result.key_points),
         projects=projects,
@@ -45,6 +57,7 @@ def analysis_result_to_insights_embedded(result: AnalysisResult) -> InsightsEmbe
         people=list(result.people),
         priorities=list(result.priorities),
         themes=list(result.themes),
+        impactful_factors=factors,
     )
 
 

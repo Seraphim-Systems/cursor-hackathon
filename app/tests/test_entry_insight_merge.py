@@ -200,7 +200,9 @@ def test_journal_insights_matches_contract_shape() -> None:
         "people",
         "priorities",
         "themes",
+        "impactful_factors",
     }
+
     assert d["projects"] == [{"name": "P", "notes": "n"}]
 
 

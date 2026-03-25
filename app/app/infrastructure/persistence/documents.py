@@ -10,6 +10,9 @@ from pymongo import ASCENDING, DESCENDING, IndexModel
 from app.schemas.user_settings import UserSettings
 
 
+SourceKind = Literal["text", "audio", "mixed"]
+
+
 class UserDocument(Document):
     """User account; `settings` matches [`user-settings.schema.json`](../../../../contracts/user-settings.schema.json)."""
 
@@ -22,19 +25,26 @@ class UserDocument(Document):
         name = "users"
 
 
-class InsightsProjectEmbedded(BaseModel):
+class ProjectItem(BaseModel):
     name: str
     notes: str = ""
 
 
+class InsightsImpactfulFactorEmbedded(BaseModel):
+    name: str
+    impact: float
+    factor_type: str = Field(alias="type")
+
+
 class InsightsEmbedded(BaseModel):
     key_points: list[str] = Field(default_factory=list)
-    projects: list[InsightsProjectEmbedded] = Field(default_factory=list)
+    projects: list[ProjectItem] = Field(default_factory=list)
     goals: list[str] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)
     people: list[str] = Field(default_factory=list)
     priorities: list[str] = Field(default_factory=list)
     themes: list[str] = Field(default_factory=list)
+    impactful_factors: list[InsightsImpactfulFactorEmbedded] = Field(default_factory=list)
 
 
 class JournalEntryDocument(Document):

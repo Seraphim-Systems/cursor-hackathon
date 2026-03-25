@@ -16,6 +16,16 @@ class ProjectInsight(BaseModel):
     notes: str = ""
 
 
+class ImpactfulFactorInsight(BaseModel):
+    """Someone or something that significantly impacted happiness/sentiment."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    impact: float
+    factor_type: str = Field(alias="type")
+
+
 class JournalInsights(BaseModel):
     """Embedded insights object returned by the API and stored on entries."""
 
@@ -28,6 +38,7 @@ class JournalInsights(BaseModel):
     people: list[str] = Field(default_factory=list)
     priorities: list[str] = Field(default_factory=list)
     themes: list[str] = Field(default_factory=list)
+    impactful_factors: list[ImpactfulFactorInsight] = Field(default_factory=list)
 
 
 def journal_insights_from_analysis(result: AnalysisResult) -> JournalInsights:
@@ -37,6 +48,15 @@ def journal_insights_from_analysis(result: AnalysisResult) -> JournalInsights:
         for p in result.projects
         if isinstance(p, dict) and str(p.get("name", "")).strip()
     ]
+    factors = [
+        ImpactfulFactorInsight(
+            name=f["name"],
+            impact=float(f.get("impact", 0)),
+            type=str(f.get("type", "topic"))
+        )
+        for f in result.impactful_factors
+        if isinstance(f, dict) and str(f.get("name", "")).strip()
+    ]
     return JournalInsights(
         key_points=list(result.key_points),
         projects=projects,
@@ -45,6 +65,7 @@ def journal_insights_from_analysis(result: AnalysisResult) -> JournalInsights:
         people=list(result.people),
         priorities=list(result.priorities),
         themes=list(result.themes),
+        impactful_factors=factors,
     )
 
 

@@ -16,4 +16,12 @@ class StubAnalyzer:
             people=[],
             priorities=[],
             themes=["reflection"],
+            impactful_factors=[],
         )
+
+    async def analyze_trends(self, *, entries_data: list[dict]) -> dict:
+        return {
+            "summary": "Stub trends overview for recent entries.",
+            "findings": ["Stub finding A: Pattern found.", "Stub finding B: Recurring event."],
+            "beneficial_actions": ["Keep up the good work!", "Take a break if needed."]
+        }

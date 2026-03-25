@@ -60,8 +60,52 @@ class AnalyzeEntryBody(BaseModel):
     )
 
 
+class TrendsSummaryResponse(BaseModel):
+    summary: str
+    findings: list[str] = Field(default_factory=list)
+    beneficial_actions: list[str] = Field(default_factory=list)
+
+
 def _repo_dep() -> JournalEntryRepository:
     return get_journal_entry_repository()
+
+
+@router.get("/trends/summary", response_model=TrendsSummaryResponse)
+async def get_trends_summary(
+    user: UserDep,
+    repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
+    analyzer: Annotated[IAIAnalyzer, Depends(get_analyzer)],
+) -> TrendsSummaryResponse:
+    """Analyze the last 50 entries to find trends and beneficial findings."""
+    items, _ = await repo.list_for_user(user_id=str(user.id), limit=50)
+    if not items:
+        return TrendsSummaryResponse(
+            summary="No entries yet to analyze trends.",
+            findings=[],
+            beneficial_actions=[]
+        )
+
+    entries_data = []
+    for e in items:
+        entries_data.append({
+            "date": e.created_at.isoformat(),
+            "sentiment": e.sentiment_score,
+            "themes": e.insights.themes,
+            "impactful_factors": [
+                {"name": f.name, "impact": f.impact, "type": f.factor_type}
+                for f in e.insights.impactful_factors
+            ]
+        })
+
+    try:
+        raw = await analyzer.analyze_trends(entries_data=entries_data)
+        return TrendsSummaryResponse.model_validate(raw)
+    except Exception as e:
+        return TrendsSummaryResponse(
+            summary=f"Could not generate trends summary: {e}",
+            findings=[],
+            beneficial_actions=[]
+        )
 
 
 @router.get("", response_model=JournalEntryListResponse)

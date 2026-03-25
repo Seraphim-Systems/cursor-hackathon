@@ -22,10 +22,10 @@ def build_audio_storage(settings: Settings) -> IAudioStorage:
 
 def build_transcriber(settings: Settings) -> ITranscriber:
     provider = (settings.transcription_provider or "").lower()
-    if provider in ("http_stt", "stub", ""):
+    if provider == "stub":
+        return StubTranscriber()
+    if provider in ("http_stt", ""):
         # Default to http_stt since it's bundled in docker-compose
-        if provider == "stub":
-            logger.info("TRANSCRIPTION_PROVIDER=stub; but we prefer http_stt for real transcripts. Use 'stub_only' for explicit stub.")
         return HttpSttTranscriber(
             base_url=settings.stt_base_url,
             path=settings.stt_transcribe_path,

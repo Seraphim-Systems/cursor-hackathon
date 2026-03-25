@@ -26,6 +26,8 @@ Keys (use null only where truly unknown):
 - people: string array (names or roles)
 - priorities: string array
 - themes: string array (thematic labels)
+- impactful_factors: array of { "name": string, "impact": number (-1 to 1), "type": "person" | "topic" | "event" } 
+  Identify specific people, topics, or events mentioned that significantly influenced the author's mood/happiness in this entry.
 
 Be concise. If the entry is empty or noise, still return valid JSON with empty arrays and a short summary."""
 
@@ -92,6 +94,51 @@ class OpenAiCompatAnalyzer:
 
         return _payload_to_result(validated)
 
+    async def analyze_trends(self, *, entries_data: list[dict]) -> dict:
+        url = f"{self._base}/chat/completions"
+        system_msg = """You analyze multiple journal entry insights to find long-term trends. 
+Identify recurring events, people, or topics and how they correlate with sentiment (mood).
+Return one JSON object only:
+- summary: string, high-level overview of recent trends
+- findings: string array, specific patterns discovered (e.g., "Mondays are stressful due to X", "Seeing [Person] always boosts mood")
+- beneficial_actions: string array, suggestions for what might improve the user's wellbeing based on the data
+"""
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "temperature": 0.5,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": system_msg},
+                {
+                    "role": "user",
+                    "content": f"Entries data for trend analysis:\n\n{json.dumps(entries_data)}",
+                },
+            ],
+        }
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            try:
+                response = await client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+            except httpx.HTTPError as e:
+                logger.warning("AI trend analysis request failed: %s", e)
+                raise
+
+        data = response.json()
+        content = (
+            data.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+        )
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError as e:
+            raise ValueError("AI returned non-JSON content for trends") from e
+
 
 def _payload_to_result(p: AIAnalysisPayload) -> AnalysisResult:
     return AnalysisResult(
@@ -104,4 +151,5 @@ def _payload_to_result(p: AIAnalysisPayload) -> AnalysisResult:
         people=list(p.people),
         priorities=list(p.priorities),
         themes=list(p.themes),
+        impactful_factors=[{"name": x.name, "impact": x.impact, "type": x.factor_type} for x in p.impactful_factors],
     )

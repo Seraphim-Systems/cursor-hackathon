@@ -19,6 +19,7 @@ class AnalysisResult(BaseModel):
     people: list[str]
     priorities: list[str]
     themes: list[str]
+    impactful_factors: list[dict] = []
 
 
 class IAudioStorage(Protocol):
@@ -35,3 +36,5 @@ class ITranscriber(Protocol):
 
 class IAIAnalyzer(Protocol):
     async def analyze(self, *, text: str) -> AnalysisResult: ...
+
+    async def analyze_trends(self, *, entries_data: list[dict]) -> dict: ...

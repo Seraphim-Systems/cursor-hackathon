@@ -25,7 +25,7 @@ from app.domain.journal_insights import (
 from app.domain.protocols import AnalysisResult
 
 INSIGHT_SUBKEYS = frozenset(
-    {"key_points", "projects", "goals", "blockers", "people", "priorities", "themes"}
+    {"key_points", "projects", "goals", "blockers", "people", "priorities", "themes", "impactful_factors"}
 )
 
 

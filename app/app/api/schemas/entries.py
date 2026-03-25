@@ -19,6 +19,14 @@ class InsightProjectOut(BaseModel):
     notes: str | None = None
 
 
+class ImpactfulFactorOut(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    impact: float
+    factor_type: str = Field(alias="type")
+
+
 class InsightsOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -29,6 +37,7 @@ class InsightsOut(BaseModel):
     people: list[str] = Field(default_factory=list)
     priorities: list[str] = Field(default_factory=list)
     themes: list[str] = Field(default_factory=list)
+    impactful_factors: list[ImpactfulFactorOut] = Field(default_factory=list)
 
 
 class JournalEntryOut(BaseModel):
@@ -61,6 +70,7 @@ def journal_entry_to_out(doc: JournalEntryDocument) -> JournalEntryOut:
             raw.people,
             raw.priorities,
             raw.themes,
+            raw.impactful_factors,
         ]
     ):
         insights = None
