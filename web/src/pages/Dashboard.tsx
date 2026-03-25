@@ -1,53 +1,61 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { listEntries } from "../api/client";
+import { getPeriodSummary, listEntries } from "../api/client";
 import type { JournalEntry } from "../api/types";
 import { DuckMicButton, DuckRecordButton } from "../components/DuckRecordButton";
-import { EntryAudioPlayer } from "../components/EntryAudioPlayer";
-import { EntryRemoveButton } from "../components/EntryRemoveButton";
 import { useAuth } from "../auth/AuthContext";
 import { useJournalRecording } from "../hooks/useJournalRecording";
 
-function previewText(entry: JournalEntry): string {
-  const pick = (): string => {
-    const s = entry.summary?.trim();
-    if (s) return s;
-    const c = entry.cleaned_text?.trim();
-    if (c) return c;
-    const t = entry.transcript?.trim();
-    if (t) return t;
-    return "(No text)";
-  };
-  return pick().replace(/\s+/g, " ").trim();
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+function oneLinePreview(text: string, max = 84): string {
+  const clean = (text || "").replace(/\s+/g, " ").trim();
+  if (!clean) return "No entries yet.";
+  if (clean.length <= max) return clean;
+  return clean.slice(0, max - 1).trimEnd() + "…";
 }
 
-function formatWhen(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
-  } catch {
-    return iso;
-  }
+function isoDateYmd(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 
-/** Dashboard list: only this many newest entries (full archive is on History). */
-const DASHBOARD_RECENT_LIMIT = 6;
-
-function newestFirst(entries: JournalEntry[]): JournalEntry[] {
-  return [...entries].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+function monthRange(year: number, month1to12: number): { from: string; to: string } {
+  const from = new Date(Date.UTC(year, month1to12 - 1, 1));
+  const to = new Date(Date.UTC(year, month1to12, 0)); // last day of month
+  return { from: isoDateYmd(from), to: isoDateYmd(to) };
 }
 
 export function Dashboard() {
-  const { token, duckName: authDuckName } = useAuth();
-  const duckName = authDuckName || "the duck";
+  const { token } = useAuth();
   const [items, setItems] = useState<JournalEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const now = useMemo(() => new Date(), []);
+  const [selectedYear, setSelectedYear] = useState<number>(() => now.getUTCFullYear());
+  const years = useMemo(() => [2024, 2025, 2026], []);
+
+  const [yearSummary, setYearSummary] = useState<string>("");
+  const [monthSummaries, setMonthSummaries] = useState<Record<number, { full: string; preview: string }>>({});
+  const [calendarLoading, setCalendarLoading] = useState(false);
+
   const refreshEntries = useCallback(() => {
     if (!token) return;
-    listEntries(DASHBOARD_RECENT_LIMIT, 0)
-      .then((data) => setItems(newestFirst(data.items).slice(0, DASHBOARD_RECENT_LIMIT)))
+    listEntries(1, 0)
+      .then((data) => setItems(data.items))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load entries"));
   }, [token]);
 
@@ -63,7 +71,7 @@ export function Dashboard() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    listEntries(10, 0)
+    listEntries(1, 0)
       .then((data) => {
         if (!cancelled) setItems(data.items);
       })
@@ -78,18 +86,53 @@ export function Dashboard() {
     };
   }, [token]);
 
-  const recentEntries = useMemo(() => {
-    if (!items?.length) return [];
-    return newestFirst(items).slice(0, DASHBOARD_RECENT_LIMIT);
-  }, [items]);
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    setCalendarLoading(true);
+    setYearSummary("");
+    setMonthSummaries({});
+
+    (async () => {
+      try {
+        // Year summary
+        const yearFrom = `${selectedYear}-01-01`;
+        const yearTo = `${selectedYear}-12-31`;
+        const y = await getPeriodSummary(yearFrom, yearTo, "year");
+        if (cancelled) return;
+        const yFull = (y.summary || "").trim();
+        setYearSummary(yFull);
+
+        // Month previews (12 calls; server caches)
+        const promises = MONTHS.map(async (_m, idx) => {
+          const month = idx + 1;
+          const { from, to } = monthRange(selectedYear, month);
+          const s = await getPeriodSummary(from, to, "month");
+          const full = (s.summary || "").trim();
+          return [month, { full, preview: oneLinePreview(full) }] as const;
+        });
+
+        const pairs = await Promise.all(promises);
+        if (cancelled) return;
+        const next: Record<number, { full: string; preview: string }> = {};
+        for (const [m, v] of pairs) next[m] = v;
+        setMonthSummaries(next);
+      } finally {
+        if (!cancelled) setCalendarLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, selectedYear]);
 
   return (
     <div className="page-shell">
       <section className="dashboard-hero" aria-labelledby="dashboard-hero-title">
         <h2 id="dashboard-hero-title" className="dashboard-hero__title">
-          Talk to {duckName}
+          Talk to the Duck
         </h2>
-        <p className="dashboard-hero__subtitle">{duckName === "the duck" ? "The duck" : duckName} helps you capture what you’re thinking.</p>
         <div className="dashboard-duck-wrap">
           {token ? (
             <div className="dashboard-duck-inline">
@@ -113,7 +156,11 @@ export function Dashboard() {
                 uploading={phase === "uploading"}
                 disabled={!supported || !token}
                 onPress={onDuckPress}
+                showText={false}
               />
+              <p className="dashboard-counter" aria-label="Saved recordings count">
+                {loading && items === null ? "Loading…" : `${items?.length ?? 0} recordings saved`}
+              </p>
               {phase === "uploading" && uploadPct !== null ? (
                 <div className="dashboard-upload-progress">
                   <div
@@ -171,57 +218,71 @@ export function Dashboard() {
       {token && !loading && !error && (items?.length ?? 0) === 0 ? (
         <section className="empty-state" aria-live="polite">
           <p style={{ margin: 0 }}>No journal entries yet.</p>
-          <p className="muted" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
-            Use {duckName} above to speak your first thought and save it here.
-          </p>
         </section>
       ) : null}
 
-      {token && recentEntries.length > 0 ? (
-        <section className="dashboard-recent">
-          <div className="dashboard-recent__head">
-            <h3 className="section-label dashboard-recent__title">Recent entries</h3>
-            <p className="dashboard-recent__hint muted">
-              Your {recentEntries.length} most recent {recentEntries.length === 1 ? "entry" : "entries"}.{" "}
-              <Link to="/history" className="dashboard-recent__history-link">
-                See all entries in History
+      {token ? (
+        <section className="dashboard-calendar" aria-label="Calendar">
+          <div className="dashboard-calendar__head">
+            <h3 className="section-label" style={{ marginBottom: 0 }}>
+              Calendar
+            </h3>
+            <div className="dashboard-calendar__controls">
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="field-narrow"
+                aria-label="Select year"
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+              <Link to="/history" className="dashboard-calendar__link">
+                Open all entries →
               </Link>
-              .
-            </p>
+            </div>
           </div>
-          <ul className="entry-list">
-            {recentEntries.map((entry) => (
-              <li key={entry.id} className="entry-list-item">
-                <div className="entry-list-item__bubble-wrap">
-                  <time className="entry-list-item__recorded" dateTime={entry.created_at}>
-                    Recorded {formatWhen(entry.created_at)}
-                  </time>
-                  <div className="entry-list-item__card-row">
-                    <EntryRemoveButton
-                      entryId={entry.id}
-                      onRemoved={() =>
-                        setItems((prev) => (prev ? prev.filter((x) => x.id !== entry.id) : prev))
-                      }
-                    />
-                    <Link
-                      to={`/entries/${entry.id}`}
-                      state={{ from: "/" }}
-                      className="entry-card-link entry-card-link--oneline"
-                    >
-                      <span className="entry-card-oneline">
-                        <strong className="entry-card-oneline__title">{previewText(entry)}</strong>
-                      </span>
-                    </Link>
-                  </div>
-                  {entry.audio_storage_key ? (
-                    <div className="entry-list-item__audio">
-                      <EntryAudioPlayer entryId={entry.id} compact />
-                    </div>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
+
+          <div className="calendar-tree-root" style={{ padding: "0.85rem" }}>
+            <div className="calendar-tree-summary">
+              {calendarLoading ? (
+                <span className="muted">Loading year summary…</span>
+              ) : (
+                <span title={yearSummary || ""}>
+                  {oneLinePreview(yearSummary || "No entries for this year yet.", 160)}
+                </span>
+              )}
+            </div>
+
+            <div className="dashboard-month-grid" role="list" aria-label="Months">
+              {MONTHS.map((m, idx) => {
+                const month = idx + 1;
+                const s = monthSummaries[month];
+                const preview = s?.preview ?? (calendarLoading ? "Loading…" : "No entries yet.");
+                const full = s?.full ?? "";
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    className="dashboard-month-tile"
+                    title={full || preview}
+                    onClick={() => {
+                      const { from, to } = monthRange(selectedYear, month);
+                      // jump to archive filter via History page; keeps minimal dashboard
+                      window.location.href = `/history?from=${from}&to=${to}`;
+                    }}
+                    role="listitem"
+                  >
+                    <span className="dashboard-month-tile__name">{m}</span>
+                    <span className="dashboard-month-tile__preview">{preview}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </section>
       ) : null}
     </div>

@@ -11,29 +11,23 @@ from app.domain.protocols import IAIAnalyzer
 
 logger = logging.getLogger(__name__)
 
-AGGREGATE_JSON_INSTRUCTIONS = """You analyze a set of journal entries for a specific time period (Year, Month, or Week).
+AGGREGATE_JSON_INSTRUCTIONS = """You organize a set of journal entries for a specific time period (Year, Month, or Week).
 Return one JSON object only, no markdown.
 Keys:
-- summary: string, a comprehensive summary of the period
-- sentiment_trend: string, description of how the mood evolved
-- key_achievements: string array
+- summary: string, a neutral summary of what happened in the period (no advice)
 - top_themes: string array
 - significant_people: string array
 
-Be insightful and look for patterns across the entries."""
+Do not give advice. Do not diagnose emotions. Keep it factual and useful for navigation."""
 
 class AggregateAnalysisResult:
     def __init__(
         self,
         summary: str,
-        sentiment_trend: str,
-        key_achievements: list[str],
         top_themes: list[str],
         significant_people: list[str],
     ):
         self.summary = summary
-        self.sentiment_trend = sentiment_trend
-        self.key_achievements = key_achievements
         self.top_themes = top_themes
         self.significant_people = significant_people
 
@@ -48,8 +42,6 @@ async def analyze_aggregate(
     if not texts:
         return {
             "summary": "No entries for this period.",
-            "sentiment_trend": "N/A",
-            "key_achievements": [],
             "top_themes": [],
             "significant_people": [],
         }
@@ -82,8 +74,6 @@ async def analyze_aggregate(
             logger.warning("Aggregate AI analysis failed: %s", e)
             return {
                 "summary": "Error generating summary.",
-                "sentiment_trend": "Error",
-                "key_achievements": [],
                 "top_themes": [],
                 "significant_people": [],
             }

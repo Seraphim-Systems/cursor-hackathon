@@ -115,6 +115,22 @@ docker run --rm -v "$(pwd)/web:/app" -w /app node:20-alpine sh -c "npm install"
 
 Commit the updated `package-lock.json` if you want reproducible `npm ci` builds.
 
+## Seed demo data (optional)
+
+If you want the UI to look “real” immediately (entries across multiple months + warmed year/month/day summaries), run:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm app \
+  python scripts/seed_demo_data.py --email demo@example.com --password demo12345
+```
+
+Then open:
+
+- Web UI: http://localhost:5173
+- Calendar: http://localhost:5173/calendar
+- History: http://localhost:5173/history
+
 ## Work breakdown and API contracts
 
 - [app/README.md](app/README.md) — Python `.venv`, local `uvicorn` / `pytest`

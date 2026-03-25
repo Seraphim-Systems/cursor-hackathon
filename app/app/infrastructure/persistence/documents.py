@@ -84,8 +84,6 @@ class PeriodSummaryDocument(Document):
     end_date: str    # ISO YYYY-MM-DD
     
     summary: str
-    sentiment_trend: str
-    key_achievements: list[str] = Field(default_factory=list)
     top_themes: list[str] = Field(default_factory=list)
     significant_people: list[str] = Field(default_factory=list)
 

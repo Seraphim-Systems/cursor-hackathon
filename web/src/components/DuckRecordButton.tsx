@@ -83,10 +83,12 @@ type MicProps = {
   disabled?: boolean;
   /** Idle → start mic; recording → stop & upload */
   onPress: () => void;
+  /** When false, hide label/hint copy under the duck (Dashboard wants minimal). */
+  showText?: boolean;
 };
 
 /** Record page — same duck; tap to start, tap again to stop & upload. */
-export function DuckMicButton({ recording, uploading, disabled, onPress }: MicProps) {
+export function DuckMicButton({ recording, uploading, disabled, onPress, showText = true }: MicProps) {
   const label = uploading
     ? "Saving your thought…"
     : recording
@@ -122,8 +124,12 @@ export function DuckMicButton({ recording, uploading, disabled, onPress }: MicPr
       <span className="duck-record-btn__duck-hit">
         <DuckRecordFace recording={recording} uploading={uploading} />
       </span>
-      <span className="duck-record-btn__label">{label}</span>
-      <span className="duck-record-btn__hint">{hint}</span>
+      {showText ? (
+        <>
+          <span className="duck-record-btn__label">{label}</span>
+          <span className="duck-record-btn__hint">{hint}</span>
+        </>
+      ) : null}
     </button>
   );
 }

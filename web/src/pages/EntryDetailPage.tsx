@@ -8,7 +8,6 @@ import {
   safeEntryBackPath,
   type EntryDetailNavState,
 } from "../utils/entryNavigation";
-import { emotionMarkerPercent, emotionRatingFromSentiment } from "../utils/emotionRating";
 
 function formatRecordedAt(iso: string): string {
   try {
@@ -102,7 +101,6 @@ export function EntryDetailPage() {
 
   const transcription = normalizeProseForDisplay(transcriptionText(entry));
   const summaryText = normalizeProseForDisplay(entry.summary?.trim() ?? "");
-  const emotion = emotionRatingFromSentiment(entry.sentiment_score);
 
   return (
     <div className="page-shell entry-detail-page">
@@ -139,39 +137,6 @@ export function EntryDetailPage() {
           <p className="entry-detail-block__body">{summaryText}</p>
         ) : (
           <p className="entry-detail-block__empty">(No text)</p>
-        )}
-      </section>
-
-      <section className="entry-detail-block" aria-label="Emotion">
-        <span className="entry-detail-block__label">Emotion</span>
-        {emotion ? (
-          <div
-            className="entry-emotion"
-            role="group"
-            aria-label={`Emotion ${emotion.label}, intensity ${emotion.value} of 10 (1 is low, 10 is high)`}
-          >
-            <div className="entry-emotion__row">
-              <p className="entry-emotion__name">{emotion.label}</p>
-              <div className="entry-emotion__score" aria-hidden="true">
-                <span className="entry-emotion__score-num">{emotion.value}</span>
-                <span className="entry-emotion__score-max">/10</span>
-              </div>
-            </div>
-            <div className="entry-emotion__meter-wrap" aria-hidden="true">
-              <div className="entry-emotion__meter-track">
-                <span
-                  className="entry-emotion__meter-marker"
-                  style={{ left: `${emotionMarkerPercent(emotion.value)}%` }}
-                />
-              </div>
-              <div className="entry-emotion__scale">
-                <span>1 · low</span>
-                <span>10 · high</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <p className="entry-detail-block__empty">No rating yet</p>
         )}
       </section>
     </div>

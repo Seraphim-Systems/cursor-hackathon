@@ -245,30 +245,27 @@ export default function CalendarPage() {
               <p style={{ fontSize: "1.05rem", lineHeight: "1.6" }}>{summary.summary}</p>
               
               <div>
-                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Key Achievements</h4>
-                <ul className="stack-lg" style={{ gap: "0.5rem", paddingLeft: "1.2rem", margin: 0 }}>
-                  {summary.key_achievements.map((a, i) => (
-                    <li key={i} style={{ fontSize: "0.95rem" }}>{a}</li>
+                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Top themes</h4>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {summary.top_themes.map((t) => (
+                    <span
+                      key={t}
+                      className="calendar-tree-row__meta"
+                      style={{ background: "var(--color-accent-glow)", color: "var(--color-accent)" }}
+                    >
+                      {t}
+                    </span>
                   ))}
-                </ul>
+                </div>
               </div>
             </div>
 
             <div className="ui-card stack-lg" style={{ background: "rgba(0,0,0,0.2)", border: "1px solid var(--color-border)" }}>
               <div>
-                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Mood & Trends</h4>
-                <p style={{ margin: 0, fontSize: "0.92rem", color: "var(--color-text-muted)" }}>{summary.sentiment_trend}</p>
-              </div>
-
-              <div>
-                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>Top Themes</h4>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                  {summary.top_themes.map(t => (
-                    <span key={t} className="calendar-tree-row__meta" style={{ background: "var(--color-accent-glow)", color: "var(--color-accent)" }}>
-                      {t}
-                    </span>
-                  ))}
-                </div>
+                <h4 className="section-label" style={{ fontSize: "0.75rem", marginBottom: "0.5rem" }}>About these summaries</h4>
+                <p style={{ margin: 0, fontSize: "0.92rem", color: "var(--color-text-muted)" }}>
+                  This app doesn’t interpret your feelings — it only organizes recordings.
+                </p>
               </div>
 
               <div>
