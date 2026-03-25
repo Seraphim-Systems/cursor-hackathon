@@ -33,10 +33,9 @@ class CalendarResponse(BaseModel):
 
 class PeriodSummaryResponse(BaseModel):
     summary: str
-    sentiment_trend: str
     key_achievements: list[str]
     top_themes: list[str]
-    significant_people: list[str]
+    key_people: list[str]
 
 
 @router.get("/calendar", response_model=CalendarResponse)
@@ -100,20 +99,18 @@ async def _get_or_create_summary(
     if not force_refresh and cached and cached.last_entry_count == entry_count:
         return PeriodSummaryResponse(
             summary=cached.summary,
-            sentiment_trend=cached.sentiment_trend,
             key_achievements=cached.key_achievements,
             top_themes=cached.top_themes,
-            significant_people=cached.significant_people,
+            key_people=cached.key_people,
         )
 
     # 3. Only summarize if we have at least 1 entry
     if entry_count == 0:
         return PeriodSummaryResponse(
             summary="No entries for this period.",
-            sentiment_trend="N/A",
             key_achievements=[],
             top_themes=[],
-            significant_people=[],
+            key_people=[],
         )
 
     # 4. Generate new summary
@@ -153,7 +150,7 @@ async def _get_or_create_summary(
         try:
             data = json.loads(raw_content)
         except:
-            data = {"summary": raw_content, "sentiment_trend": "Unknown", "key_achievements": [], "top_themes": [], "significant_people": []}
+            data = {"summary": raw_content, "key_achievements": [], "top_themes": [], "key_people": []}
     else:
         data = raw_content
 
@@ -161,10 +158,9 @@ async def _get_or_create_summary(
     res = PeriodSummaryResponse(**data)
     if cached:
         cached.summary = res.summary
-        cached.sentiment_trend = res.sentiment_trend
         cached.key_achievements = res.key_achievements
         cached.top_themes = res.top_themes
-        cached.significant_people = res.significant_people
+        cached.key_people = res.key_people
         cached.last_entry_count = entry_count
         cached.updated_at = datetime.now(timezone.utc)
         await cached.save()
@@ -175,10 +171,9 @@ async def _get_or_create_summary(
             start_date=from_.isoformat(),
             end_date=to.isoformat(),
             summary=res.summary,
-            sentiment_trend=res.sentiment_trend,
             key_achievements=res.key_achievements,
             top_themes=res.top_themes,
-            significant_people=res.significant_people,
+            key_people=res.key_people,
             last_entry_count=entry_count,
         )
         await new_cached.insert()
