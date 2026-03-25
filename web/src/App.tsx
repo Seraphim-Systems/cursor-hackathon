@@ -11,6 +11,7 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { RecordPage } from "./pages/RecordPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import AdminPage from "./pages/AdminPage";
+import GraphPage from "./pages/GraphPage";
 
 export function App() {
   const navigate = useNavigate();
@@ -38,8 +39,8 @@ export function App() {
                 <NavLink to="/history" className={navCls}>
                   Entries
                 </NavLink>
-                <NavLink to="/trends" className={navCls}>
-                  Trends
+                <NavLink to="/insights" className={navCls}>
+                  Insights
                 </NavLink>
                 <NavLink to="/settings" className={navCls}>
                   Settings
@@ -109,7 +110,7 @@ export function App() {
             }
           />
           <Route
-            path="/trends"
+            path="/insights"
             element={
               <ProtectedRoute>
                 <GraphPage />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getPeriodSummary, listEntries } from "../api/client";
-import type { JournalEntry } from "../api/types";
+import { getCalendar, getEntry, getPeriodSummary, listEntries } from "../api/client";
+import type { CalendarDay, JournalEntry } from "../api/types";
 import { DuckMicButton, DuckRecordButton } from "../components/DuckRecordButton";
 import { useAuth } from "../auth/AuthContext";
 import { useJournalRecording } from "../hooks/useJournalRecording";
@@ -25,7 +25,8 @@ function oneLinePreview(text: string, max = 84): string {
   const clean = (text || "").replace(/\s+/g, " ").trim();
   if (!clean) return "No entries yet.";
   if (clean.length <= max) return clean;
-  return clean.slice(0, max - 1).trimEnd() + "…";
+  // Avoid appending "…" — we rely on CSS clamping/ellipsis for a cleaner look.
+  return clean.slice(0, max).trimEnd();
 }
 
 function isoDateYmd(d: Date): string {
@@ -38,6 +39,44 @@ function monthRange(year: number, month1to12: number): { from: string; to: strin
   return { from: isoDateYmd(from), to: isoDateYmd(to) };
 }
 
+function parseYmd(ymd: string): Date {
+  const [y, m, d] = ymd.split("-").map((x) => Number(x));
+  return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+}
+
+function fmtMonthDay(d: Date): string {
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+function fmtWeekLabel(fromYmd: string, toYmd: string): string {
+  const a = parseYmd(fromYmd);
+  const b = parseYmd(toYmd);
+  return `${fmtMonthDay(a)} – ${fmtMonthDay(b)}`;
+}
+
+function weekStartMonday(ymd: string): string {
+  const d = parseYmd(ymd);
+  // JS: 0=Sun..6=Sat. Convert to Monday start.
+  const dow = d.getUTCDay();
+  const delta = (dow + 6) % 7; // Mon=0, Sun=6
+  d.setUTCDate(d.getUTCDate() - delta);
+  return isoDateYmd(d);
+}
+
+function addDays(ymd: string, n: number): string {
+  const d = parseYmd(ymd);
+  d.setUTCDate(d.getUTCDate() + n);
+  return isoDateYmd(d);
+}
+
+type WeekNode = {
+  key: string; // from..to
+  from: string;
+  to: string;
+  count: number;
+  days: CalendarDay[];
+};
+
 export function Dashboard() {
   const { token } = useAuth();
   const [items, setItems] = useState<JournalEntry[] | null>(null);
@@ -49,8 +88,16 @@ export function Dashboard() {
   const years = useMemo(() => [2024, 2025, 2026], []);
 
   const [yearSummary, setYearSummary] = useState<string>("");
-  const [monthSummaries, setMonthSummaries] = useState<Record<number, { full: string; preview: string }>>({});
   const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
+
+  const [openMonth, setOpenMonth] = useState<number | null>(null);
+  const [openWeekKey, setOpenWeekKey] = useState<string | null>(null);
+  const [openDayYmd, setOpenDayYmd] = useState<string | null>(null);
+
+  const [weekSummary, setWeekSummary] = useState<Record<string, string>>({});
+  const [daySummary, setDaySummary] = useState<Record<string, string>>({});
+  const [dayEntries, setDayEntries] = useState<Record<string, JournalEntry[]>>({});
 
   const refreshEntries = useCallback(() => {
     if (!token) return;
@@ -91,7 +138,13 @@ export function Dashboard() {
     let cancelled = false;
     setCalendarLoading(true);
     setYearSummary("");
-    setMonthSummaries({});
+    setCalendarDays([]);
+    setOpenMonth(null);
+    setOpenWeekKey(null);
+    setOpenDayYmd(null);
+    setWeekSummary({});
+    setDaySummary({});
+    setDayEntries({});
 
     (async () => {
       try {
@@ -103,20 +156,10 @@ export function Dashboard() {
         const yFull = (y.summary || "").trim();
         setYearSummary(yFull);
 
-        // Month previews (12 calls; server caches)
-        const promises = MONTHS.map(async (_m, idx) => {
-          const month = idx + 1;
-          const { from, to } = monthRange(selectedYear, month);
-          const s = await getPeriodSummary(from, to, "month");
-          const full = (s.summary || "").trim();
-          return [month, { full, preview: oneLinePreview(full) }] as const;
-        });
-
-        const pairs = await Promise.all(promises);
+        // Full year calendar for counts + tree expansion
+        const cal = await getCalendar(yearFrom, yearTo);
         if (cancelled) return;
-        const next: Record<number, { full: string; preview: string }> = {};
-        for (const [m, v] of pairs) next[m] = v;
-        setMonthSummaries(next);
+        setCalendarDays(cal.days);
       } finally {
         if (!cancelled) setCalendarLoading(false);
       }
@@ -126,6 +169,76 @@ export function Dashboard() {
       cancelled = true;
     };
   }, [token, selectedYear]);
+
+  const monthCounts = useMemo(() => {
+    const m: Record<number, number> = {};
+    for (let i = 1; i <= 12; i++) m[i] = 0;
+    for (const d of calendarDays) {
+      const mm = Number(d.date.slice(5, 7));
+      if (mm >= 1 && mm <= 12) m[mm] = (m[mm] || 0) + (d.count || 0);
+    }
+    return m;
+  }, [calendarDays]);
+
+  const monthWeeks = useMemo(() => {
+    if (openMonth == null) return [] as WeekNode[];
+    const mm = String(openMonth).padStart(2, "0");
+    const monthDays = calendarDays
+      .filter((d) => d.date.startsWith(`${selectedYear}-${mm}-`))
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+    const byWeek: Record<string, WeekNode> = {};
+    for (const day of monthDays) {
+      const ws = weekStartMonday(day.date);
+      const we = addDays(ws, 6);
+      const key = `${ws}..${we}`;
+      if (!byWeek[key]) {
+        byWeek[key] = { key, from: ws, to: we, count: 0, days: [] };
+      }
+      byWeek[key].count += day.count || 0;
+      byWeek[key].days.push(day);
+    }
+
+    return Object.values(byWeek).sort((a, b) => (a.from < b.from ? -1 : 1));
+  }, [calendarDays, openMonth, selectedYear]);
+
+  const ensureWeekSummary = useCallback(
+    async (week: WeekNode) => {
+      if (weekSummary[week.key]) return;
+      try {
+        const s = await getPeriodSummary(week.from, week.to, "week");
+        const full = (s.summary || "").trim();
+        setWeekSummary((prev) => ({ ...prev, [week.key]: full }));
+      } catch {
+        setWeekSummary((prev) => ({ ...prev, [week.key]: "" }));
+      }
+    },
+    [weekSummary],
+  );
+
+  const ensureDayDetail = useCallback(
+    async (d: CalendarDay) => {
+      const ymd = d.date;
+      if (!daySummary[ymd]) {
+        try {
+          const s = await getPeriodSummary(ymd, ymd, "day");
+          const full = (s.summary || "").trim();
+          setDaySummary((prev) => ({ ...prev, [ymd]: full }));
+        } catch {
+          setDaySummary((prev) => ({ ...prev, [ymd]: "" }));
+        }
+      }
+      if (!dayEntries[ymd]) {
+        try {
+          const entries = await Promise.all(d.entry_ids.map((id) => getEntry(id)));
+          setDayEntries((prev) => ({ ...prev, [ymd]: entries }));
+        } catch {
+          setDayEntries((prev) => ({ ...prev, [ymd]: [] }));
+        }
+      }
+    },
+    [dayEntries, daySummary],
+  );
 
   return (
     <div className="page-shell">
@@ -240,9 +353,6 @@ export function Dashboard() {
                   </option>
                 ))}
               </select>
-              <Link to="/history" className="dashboard-calendar__link">
-                Open all entries →
-              </Link>
             </div>
           </div>
 
@@ -251,8 +361,8 @@ export function Dashboard() {
               {calendarLoading ? (
                 <span className="muted">Loading year summary…</span>
               ) : (
-                <span title={yearSummary || ""}>
-                  {oneLinePreview(yearSummary || "No entries for this year yet.", 160)}
+                <span className="dashboard-year-summary" title={yearSummary || ""}>
+                  {yearSummary || "No entries for this year yet."}
                 </span>
               )}
             </div>
@@ -260,25 +370,119 @@ export function Dashboard() {
             <div className="dashboard-month-grid" role="list" aria-label="Months">
               {MONTHS.map((m, idx) => {
                 const month = idx + 1;
-                const s = monthSummaries[month];
-                const preview = s?.preview ?? (calendarLoading ? "Loading…" : "No entries yet.");
-                const full = s?.full ?? "";
+                const count = monthCounts[month] || 0;
+                const isOpen = openMonth === month;
                 return (
-                  <button
-                    key={m}
-                    type="button"
-                    className="dashboard-month-tile"
-                    title={full || preview}
-                    onClick={() => {
-                      const { from, to } = monthRange(selectedYear, month);
-                      // jump to archive filter via History page; keeps minimal dashboard
-                      window.location.href = `/history?from=${from}&to=${to}`;
-                    }}
-                    role="listitem"
-                  >
-                    <span className="dashboard-month-tile__name">{m}</span>
-                    <span className="dashboard-month-tile__preview">{preview}</span>
-                  </button>
+                  <div key={m} role="listitem" className="dashboard-month-node">
+                    <button
+                      type="button"
+                      className="dashboard-month-tile"
+                      onClick={() => {
+                        setOpenDayYmd(null);
+                        setOpenWeekKey(null);
+                        setOpenMonth((prev) => (prev === month ? null : month));
+                      }}
+                      aria-expanded={isOpen}
+                    >
+                      <span className="dashboard-month-tile__name">{m}</span>
+                      <span className="dashboard-month-tile__count">{count} recordings</span>
+                    </button>
+
+                    {isOpen ? (
+                      <div className="dashboard-month-expand" role="region" aria-label={`${m} weeks`}>
+                        {monthWeeks.map((week) => {
+                          const open = openWeekKey === week.key;
+                          const ws = weekSummary[week.key];
+                          return (
+                            <div key={week.key} className="dashboard-week-node">
+                              <button
+                                type="button"
+                                className="dashboard-tree-row"
+                                onClick={() => {
+                                  setOpenDayYmd(null);
+                                  setOpenWeekKey((prev) => (prev === week.key ? null : week.key));
+                                  void ensureWeekSummary(week);
+                                }}
+                                aria-expanded={open}
+                                title={ws || ""}
+                              >
+                                <span className="dashboard-tree-row__label">{fmtWeekLabel(week.from, week.to)}</span>
+                                <span className="dashboard-tree-row__meta">{week.count} recordings</span>
+                              </button>
+
+                              {open ? (
+                                <div className="dashboard-tree-children" role="region" aria-label="Days">
+                                  {week.days.map((d) => {
+                                    const isDayOpen = openDayYmd === d.date;
+                                    const ds = daySummary[d.date];
+                                    const dsPreview = ds ? oneLinePreview(ds, 96) : "";
+                                    return (
+                                      <div key={d.date} className="dashboard-day-node">
+                                        <button
+                                          type="button"
+                                          className="dashboard-tree-row dashboard-tree-row--day"
+                                          onClick={() => {
+                                            setOpenDayYmd((prev) => (prev === d.date ? null : d.date));
+                                            void ensureDayDetail(d);
+                                          }}
+                                          aria-expanded={isDayOpen}
+                                        >
+                                          <span className="dashboard-tree-row__label">
+                                            {fmtMonthDay(parseYmd(d.date))}{" "}
+                                            <span className="dashboard-tree-row__subtle">
+                                              ({d.count} recordings)
+                                            </span>
+                                          </span>
+                                          <span className="dashboard-tree-row__meta">
+                                            {ds ? dsPreview : d.count > 0 ? "Loading summary…" : "No entries"}
+                                          </span>
+                                        </button>
+
+                                        {isDayOpen ? (
+                                          <div className="dashboard-day-detail ui-card">
+                                            <h4 className="dashboard-day-detail__title">
+                                              {d.date}
+                                            </h4>
+                                            <p className="dashboard-day-detail__summary" title={daySummary[d.date] || ""}>
+                                              {daySummary[d.date] || "No summary for this day."}
+                                            </p>
+
+                                            {dayEntries[d.date] && dayEntries[d.date].length > 0 ? (
+                                              <div className="dashboard-day-entries">
+                                                {dayEntries[d.date].map((e) => (
+                                                  <div key={e.id} className="dashboard-entry-card">
+                                                    <div className="dashboard-entry-card__head">
+                                                      <Link to={`/entries/${e.id}`} className="dashboard-entry-card__link">
+                                                        {e.summary || "(Entry)"}
+                                                      </Link>
+                                                      <span className="dashboard-entry-card__meta">
+                                                        {new Date(e.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                      </span>
+                                                    </div>
+                                                    <p className="dashboard-entry-card__transcript">
+                                                      {e.transcript || e.cleaned_text || "(No transcript)"}
+                                                    </p>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <p className="muted" style={{ margin: 0 }}>
+                                                {d.count > 0 ? "Loading entries…" : "No entries for this day."}
+                                              </p>
+                                            )}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
                 );
               })}
             </div>
