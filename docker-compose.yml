@@ -62,8 +62,11 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
     restart: unless-stopped
-    ports:
-      - "80:80"
+    expose:
+      - "80"
+    networks:
+      - default
+      - proxy
     depends_on:
       - app
 
@@ -71,3 +74,9 @@ volumes:
   mongo_data:
   audio_uploads:
   whisper_cache:
+
+networks:
+  # Must exist on the host (for example: `docker network create proxy`).
+  proxy:
+    external: true
+    name: ${EXTERNAL_PROXY_NETWORK:-proxy}
