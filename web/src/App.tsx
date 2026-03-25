@@ -5,7 +5,6 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Dashboard } from "./pages/Dashboard";
 import { EntryDetailPage } from "./pages/EntryDetailPage";
 import { HistoryPage } from "./pages/HistoryPage";
-import GraphPage from "./pages/GraphPage";
 import { LoginPage } from "./pages/Login";
 import { RegisterPage } from "./pages/RegisterPage";
 import { RecordPage } from "./pages/RecordPage";
@@ -40,7 +39,7 @@ export function App() {
                   Entries
                 </NavLink>
                 <NavLink to="/insights" className={navCls}>
-                  Insights
+                  Trends
                 </NavLink>
                 <NavLink to="/settings" className={navCls}>
                   Settings

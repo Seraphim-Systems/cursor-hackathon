@@ -128,37 +128,18 @@ export function Dashboard() {
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
 
   const refreshEntries = useCallback(() => {
-    if (!token) return;
-    listEntries(1, 0)
-      .then((data) => setItems(data.items))
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : "Failed to load entries"));
-  }, [token]);
+    // No-op for now as we removed the counter
+  }, []);
 
   const { supported, phase, error: recordError, uploadPct, savedToast, onDuckPress } =
     useJournalRecording(refreshEntries);
 
   useEffect(() => {
     if (!token) {
-      setItems(null);
       setError(null);
       return;
     }
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    listEntries(1, 0)
-      .then((data) => {
-        if (!cancelled) setItems(data.items);
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load entries");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    // No longer fetching the first item for counter
   }, [token]);
 
   useEffect(() => {
@@ -292,9 +273,6 @@ export function Dashboard() {
                 onPress={onDuckPress}
                 showText={false}
               />
-              <p className="dashboard-counter" aria-label="Saved recordings count">
-                {loading && items === null ? "Loading…" : `${items?.length ?? 0} recordings saved`}
-              </p>
               {phase === "uploading" && uploadPct !== null ? (
                 <div className="dashboard-upload-progress">
                   <div
@@ -329,31 +307,11 @@ export function Dashboard() {
         </section>
       ) : null}
 
-      {token && loading && items === null ? (
-        <section aria-busy="true">
-          <p className="muted">Loading entries…</p>
-        </section>
-      ) : null}
-
-      {token && error ? (
+      {token && error && (
         <section>
-          <p>Could not load entries.</p>
-          <p className="text-error" style={{ marginTop: "0.5rem" }}>
-            {error}
-          </p>
-          <p style={{ marginTop: "0.75rem" }}>
-            <Link to="/login" className="btn-gold">
-              Sign in again
-            </Link>
-          </p>
+          <p className="text-error" style={{ textAlign: "center", marginTop: "1rem" }}>{error}</p>
         </section>
-      ) : null}
-
-      {token && !loading && !error && (items?.length ?? 0) === 0 ? (
-        <section className="empty-state" aria-live="polite">
-          <p style={{ margin: 0 }}>No journal entries yet.</p>
-        </section>
-      ) : null}
+      )}
 
       {token ? (
         <section className="dashboard-calendar" aria-label="Calendar">

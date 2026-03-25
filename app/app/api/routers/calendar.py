@@ -176,7 +176,14 @@ async def _get_or_create_summary(
             key_people=res.key_people,
             last_entry_count=entry_count,
         )
-        await new_cached.insert()
+        try:
+            await new_cached.insert()
+        except Exception as e:
+            # If concurrent insert happened, just ignore and let the next read use the cache
+            if "duplicate key error" in str(e).lower():
+                logger.info("Concurrent PeriodSummary insertion for %s", from_)
+            else:
+                raise
 
     return res
 
