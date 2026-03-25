@@ -25,14 +25,25 @@ jobs:
           ssh ${{ secrets.INFRA_HETZNER_USER }}@${{ secrets.INFRA_HETZNER_HOST }} << 'ENDSSH'
           set -e
           REPO_PATH="/home/${{ secrets.INFRA_HETZNER_USER }}/cursor-hackathon"
-          if [ -d "$REPO_PATH/.git" ]; then
+          PARENT_DIR=$(dirname "$REPO_PATH")
+          
+          # 1. Ensure parent directory exists
+          mkdir -p "$PARENT_DIR"
+          
+          # 2. Clone if not exists, otherwise update
+          if [ ! -d "$REPO_PATH/.git" ]; then
+            echo "Cloning repository..."
+            # Using GITHUB_TOKEN secret which is available by default in actions
+            git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git "$REPO_PATH"
             cd "$REPO_PATH"
+          else
+            echo "Updating repository..."
+            cd "$REPO_PATH"
+            # Update remote URL to include token for subsequent fetches
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             git fetch origin
             git reset --hard origin/main
             git clean -fd
-          else
-            git clone https://github.com/${{ github.repository }}.git "$REPO_PATH"
-            cd "$REPO_PATH"
           fi
           ENDSSH
 
