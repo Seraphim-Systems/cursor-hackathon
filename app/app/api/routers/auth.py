@@ -14,7 +14,7 @@ _users = UserRepository()
 
 
 def _user_public(doc: UserDocument) -> UserPublic:
-    return UserPublic(id=str(doc.id), email=str(doc.email))
+    return UserPublic(id=str(doc.id), email=str(doc.email), is_admin=bool(doc.is_admin))
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=TokenResponse)

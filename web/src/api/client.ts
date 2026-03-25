@@ -1,6 +1,11 @@
 import type { UserSettings } from "../types/userSettings";
 import type { CalendarResponse, EntryListResponse, JournalEntry, TokenResponse } from "./types";
 
+export type MeResponse = {
+  user: { id: string; email: string; is_admin?: boolean };
+  settings: UserSettings;
+};
+
 export type { CalendarResponse, EntryListResponse, JournalEntry, TokenResponse } from "./types";
 
 const TOKEN_KEY = "journal_access_token";
@@ -87,6 +92,10 @@ export async function register(email: string, password: string): Promise<TokenRe
   });
 }
 
+export async function getMe(): Promise<MeResponse> {
+  return apiFetch<MeResponse>("/api/auth/me");
+}
+
 export async function listEntries(limit = 50, offset = 0): Promise<EntryListResponse> {
   const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   return apiFetch<EntryListResponse>(`/api/entries?${q.toString()}`);
@@ -94,6 +103,27 @@ export async function listEntries(limit = 50, offset = 0): Promise<EntryListResp
 
 export async function getEntry(id: string): Promise<JournalEntry> {
   return apiFetch<JournalEntry>(`/api/entries/${encodeURIComponent(id)}`);
+}
+
+export async function deleteEntry(id: string): Promise<void> {
+  return apiFetch<void>(`/api/entries/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+/** Binary GET — use with `URL.createObjectURL` for `<audio src>` (includes Bearer token). */
+export async function fetchEntryAudio(entryId: string): Promise<Blob> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(apiUrl(`/api/entries/${encodeURIComponent(entryId)}/audio`), { headers });
+  if (res.status === 401) {
+    clearToken();
+    throw new ApiError("Unauthorized", 401);
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new ApiError(parseDetailString(text), res.status, text);
+  }
+  return res.blob();
 }
 
 function parseDetailString(text: string): string {

@@ -18,6 +18,12 @@ class _MemoryAudioStorage:
     async def delete(self, storage_key: str) -> None:
         pass
 
+    async def read_bytes(self, storage_key: str) -> bytes | None:
+        for uid, hint, data in self.saved:
+            if f"{uid}/{hint}" == storage_key:
+                return data
+        return None
+
 
 @pytest.mark.asyncio
 async def test_save_audio_and_transcribe_order_and_outputs() -> None:

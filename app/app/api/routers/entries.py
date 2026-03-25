@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import UserDep, get_analyzer, get_audio_storage, get_transcriber
@@ -27,6 +28,23 @@ from app.infrastructure.persistence.journal_entry_repository import (
 )
 
 router = APIRouter(prefix="/entries", tags=["entries"])
+
+_AUDIO_EXT_TO_MIME: dict[str, str] = {
+    ".webm": "audio/webm",
+    ".wav": "audio/wav",
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".mp4": "audio/mp4",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+    ".bin": "application/octet-stream",
+}
+
+
+def _audio_media_type_for_storage_key(storage_key: str) -> str:
+    ext = Path(storage_key).suffix.lower()
+    return _AUDIO_EXT_TO_MIME.get(ext, "application/octet-stream")
+
 
 _INSIGHT_PATCH_KEYS = frozenset(
     {"summary", "sentiment_score", "insights", "insights_field_locks"},
@@ -179,6 +197,26 @@ async def create_entry(
         status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
         detail="Content-Type must be application/json or multipart/form-data",
     )
+
+
+@router.get("/{entry_id}/audio")
+async def get_entry_audio(
+    entry_id: str,
+    user: UserDep,
+    repo: Annotated[JournalEntryRepository, Depends(_repo_dep)],
+    storage: Annotated[IAudioStorage, Depends(get_audio_storage)],
+) -> Response:
+    """Stream stored audio for the entry owner (same auth as JSON APIs)."""
+    entry = await repo.get_owned(entry_id, str(user.id))
+    if entry is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")
+    if not entry.audio_storage_key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No audio for this entry")
+    data = await storage.read_bytes(entry.audio_storage_key)
+    if data is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audio file missing")
+    media = _audio_media_type_for_storage_key(entry.audio_storage_key)
+    return Response(content=data, media_type=media)
 
 
 @router.get("/{entry_id}", response_model=JournalEntryOut)

@@ -124,3 +124,36 @@ def test_post_entry_multipart_audio_sets_storage_key(client: TestClient, tmp_pat
     finally:
         client.app.dependency_overrides.pop(get_transcriber, None)
         client.app.dependency_overrides.pop(get_audio_storage, None)
+
+
+def test_get_entry_audio_streams_bytes(client: TestClient, tmp_path) -> None:
+    client.app.dependency_overrides[get_audio_storage] = lambda: LocalAudioStorage(tmp_path)
+    client.app.dependency_overrides[get_transcriber] = lambda: StubTranscriber()
+    try:
+        token, _user_id = _register(client)
+        h = {"Authorization": f"Bearer {token}"}
+        payload = b"\x1a\x45\xdf\xa3"
+        r = client.post(
+            "/api/entries",
+            headers=h,
+            files={"audio": ("clip.webm", payload, "audio/webm")},
+        )
+        assert r.status_code == 201, r.text
+        eid = r.json()["id"]
+        r_audio = client.get(f"/api/entries/{eid}/audio", headers=h)
+        assert r_audio.status_code == 200
+        assert r_audio.content == payload
+        assert "webm" in r_audio.headers.get("content-type", "")
+
+        r_text = client.post(
+            "/api/entries",
+            headers=h,
+            json={"source": "text", "cleaned_text": "no audio"},
+        )
+        assert r_text.status_code == 201
+        no_audio_id = r_text.json()["id"]
+        r404 = client.get(f"/api/entries/{no_audio_id}/audio", headers=h)
+        assert r404.status_code == 404
+    finally:
+        client.app.dependency_overrides.pop(get_transcriber, None)
+        client.app.dependency_overrides.pop(get_audio_storage, None)

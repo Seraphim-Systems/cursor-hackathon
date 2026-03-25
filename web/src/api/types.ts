@@ -51,5 +51,5 @@ export interface TokenResponse {
   access_token: string;
   token_type: string;
   expires_in: number;
-  user: { id: string; email: string };
+  user: { id: string; email: string; is_admin?: boolean };
 }

@@ -66,6 +66,7 @@ def test_register_login_me_flow(auth_client: TestClient) -> None:
     assert r_me.status_code == 200
     me = r_me.json()
     assert me["user"]["email"] == email.lower()
+    assert me["user"]["is_admin"] is False
     assert me["settings"]["timezone"] == "UTC"
 
     r_login = auth_client.post(

@@ -1,7 +1,10 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 import { getSettings, patchSettings } from "../api/client";
+import { TimezoneCombobox } from "../components/TimezoneCombobox";
 import type { AudioQuality, Theme, UserSettings, WeekStartsOn } from "../types/userSettings";
+import { getSortedTimeZoneIds } from "../utils/timezoneOptions";
 
 const empty: UserSettings = {
   timezone: "UTC",
@@ -13,12 +16,20 @@ const empty: UserSettings = {
 
 /** Renders under `ProtectedRoute` — token is present. */
 export function SettingsPage() {
+  const { refreshSession } = useAuth();
   const [values, setValues] = useState<UserSettings>(empty);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState(false);
   const [pending, setPending] = useState(false);
+
+  const timezoneIds = useMemo(() => getSortedTimeZoneIds(), []);
+  const timezoneOptions = useMemo(() => {
+    const tz = (values.timezone ?? "").trim() || "UTC";
+    if (timezoneIds.includes(tz)) return timezoneIds;
+    return [tz, ...timezoneIds];
+  }, [timezoneIds, values.timezone]);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +68,7 @@ export function SettingsPage() {
       });
       setValues(next);
       setSaveOk(true);
+      void refreshSession();
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -93,13 +105,11 @@ export function SettingsPage() {
         <h2 className="page-title">Settings</h2>
         <form onSubmit={onSubmit} className="stack-lg" style={{ marginTop: "0.5rem" }}>
           <label className="form-field">
-            <span className="muted">Timezone (IANA)</span>
-            <input
-              type="text"
-              value={values.timezone}
-              onChange={(ev) => setValues((v) => ({ ...v, timezone: ev.target.value }))}
-              placeholder="e.g. Europe/Berlin"
-              autoComplete="off"
+            <span className="muted">Timezone</span>
+            <TimezoneCombobox
+              value={(values.timezone ?? "").trim() || "UTC"}
+              onChange={(tz) => setValues((v) => ({ ...v, timezone: tz }))}
+              options={timezoneOptions}
             />
           </label>
           <label className="form-field">
