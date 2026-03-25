@@ -12,6 +12,7 @@ const empty: UserSettings = {
   default_audio_quality: "medium",
   theme: "system",
   notifications_enabled: true,
+  duck_name: "the duck",
 };
 
 /** Renders under `ProtectedRoute` — token is present. */

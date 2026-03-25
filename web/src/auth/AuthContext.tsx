@@ -24,6 +24,8 @@ type AuthContextValue = {
   logout: () => void;
   /** From `GET /api/auth/me` after a valid token is present. */
   isAdmin: boolean;
+  /** Custom name for the duck companion. */
+  duckName: string;
   /** False until `/me` finishes (or no token). */
   meReady: boolean;
   /** Re-fetch `/me` (e.g. after settings save) to refresh admin + theme. */
