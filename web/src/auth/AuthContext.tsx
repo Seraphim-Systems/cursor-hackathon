@@ -30,17 +30,27 @@ type AuthContextValue = {
   refreshSession: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+const AuthContext = createContext<AuthContextValue | null>({
+  token: null,
+  setToken: () => {},
+  logout: () => {},
+  isAdmin: false,
+  duckName: "the duck",
+  meReady: true,
+  refreshSession: async () => {},
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTokenState] = useState<string | null>(() => getToken());
   const [isAdmin, setIsAdmin] = useState(false);
+  const [duckName, setDuckName] = useState("the duck");
   const [meReady, setMeReady] = useState(() => !getToken());
   const [themePref, setThemePref] = useState<Theme | null>(null);
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => computeResolvedTheme("system"));
 
   const applyMe = useCallback((me: Awaited<ReturnType<typeof getMe>>) => {
     setIsAdmin(Boolean(me.user.is_admin));
+    setDuckName(me.settings.duck_name || "the duck");
     const pref = me.settings.theme;
     setThemePref(pref);
     setResolvedTheme(computeResolvedTheme(pref));
@@ -125,8 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ token, setToken, logout, isAdmin, meReady, refreshSession }),
-    [token, setToken, logout, isAdmin, meReady, refreshSession],
+    () => ({ token, setToken, logout, isAdmin, duckName, meReady, refreshSession }),
+    [token, setToken, logout, isAdmin, duckName, meReady, refreshSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -13,6 +13,7 @@ class UserSettings(BaseModel):
     default_audio_quality: Literal["low", "medium", "high"] = "medium"
     theme: Literal["light", "dark", "system"] = "system"
     notifications_enabled: bool = True
+    duck_name: str = Field(default="Ducky", description="Custom name for your duck companion")
 
 
 class UserSettingsPatch(BaseModel):
@@ -25,6 +26,7 @@ class UserSettingsPatch(BaseModel):
     default_audio_quality: Literal["low", "medium", "high"] | None = None
     theme: Literal["light", "dark", "system"] | None = None
     notifications_enabled: bool | None = None
+    duck_name: str | None = None
 
 
 def merge_user_settings(current: UserSettings, patch: UserSettingsPatch) -> UserSettings:

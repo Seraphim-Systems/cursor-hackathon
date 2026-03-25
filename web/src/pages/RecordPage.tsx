@@ -4,7 +4,8 @@ import { DuckMicButton } from "../components/DuckRecordButton";
 import { useJournalRecording } from "../hooks/useJournalRecording";
 
 export function RecordPage() {
-  const { token } = useAuth();
+  const { token, duckName: authDuckName } = useAuth();
+  const duckName = authDuckName || "the duck";
   const { supported, phase, error, uploadPct, savedToast, onDuckPress } = useJournalRecording();
 
   return (
@@ -19,7 +20,7 @@ export function RecordPage() {
           Your thought, out loud
         </h2>
         <p className="muted" style={{ margin: 0 }}>
-          Think it through with the duck listening — we turn what you say into text you can read and keep. When
+          Think it through with {duckName} listening — we turn what you say into text you can read and keep. When
           you’re done, we save it for you.
         </p>
       </div>

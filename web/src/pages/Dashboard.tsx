@@ -38,7 +38,8 @@ function newestFirst(entries: JournalEntry[]): JournalEntry[] {
 }
 
 export function Dashboard() {
-  const { token } = useAuth();
+  const { token, duckName: authDuckName } = useAuth();
+  const duckName = authDuckName || "the duck";
   const [items, setItems] = useState<JournalEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -86,9 +87,9 @@ export function Dashboard() {
     <div className="page-shell">
       <section className="dashboard-hero" aria-labelledby="dashboard-hero-title">
         <h2 id="dashboard-hero-title" className="dashboard-hero__title">
-          Talk to the duck
+          Talk to {duckName}
         </h2>
-        <p className="dashboard-hero__subtitle">The duck helps you capture what you’re thinking.</p>
+        <p className="dashboard-hero__subtitle">{duckName === "the duck" ? "The duck" : duckName} helps you capture what you’re thinking.</p>
         <div className="dashboard-duck-wrap">
           {token ? (
             <div className="dashboard-duck-inline">
@@ -171,7 +172,7 @@ export function Dashboard() {
         <section className="empty-state" aria-live="polite">
           <p style={{ margin: 0 }}>No journal entries yet.</p>
           <p className="muted" style={{ marginTop: "0.75rem", marginBottom: 0 }}>
-            Use the duck above to speak your first thought and save it here.
+            Use {duckName} above to speak your first thought and save it here.
           </p>
         </section>
       ) : null}

@@ -65,6 +65,7 @@ export function SettingsPage() {
         default_audio_quality: values.default_audio_quality,
         theme: values.theme,
         notifications_enabled: values.notifications_enabled,
+        duck_name: values.duck_name,
       });
       setValues(next);
       setSaveOk(true);
@@ -104,6 +105,15 @@ export function SettingsPage() {
       <section className="ui-card">
         <h2 className="page-title">Settings</h2>
         <form onSubmit={onSubmit} className="stack-lg" style={{ marginTop: "0.5rem" }}>
+          <label className="form-field">
+            <span className="muted">Duck Name</span>
+            <input
+              type="text"
+              value={values.duck_name || ""}
+              onChange={(ev) => setValues((v) => ({ ...v, duck_name: ev.target.value }))}
+              placeholder="e.g. Ducky"
+            />
+          </label>
           <label className="form-field">
             <span className="muted">Timezone</span>
             <TimezoneCombobox

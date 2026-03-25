@@ -10,6 +10,7 @@ export type UserSettings = {
   default_audio_quality: AudioQuality;
   theme: Theme;
   notifications_enabled: boolean;
+  duck_name: string;
 };
 
 export type UserSettingsPatch = Partial<UserSettings>;
