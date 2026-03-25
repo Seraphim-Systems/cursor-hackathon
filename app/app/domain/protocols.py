@@ -11,7 +11,6 @@ class TranscriptionResult(BaseModel):
 
 class AnalysisResult(BaseModel):
     summary: str | None
-    sentiment_score: float | None
     key_points: list[str]
     projects: list[dict]
     goals: list[str]
@@ -19,7 +18,6 @@ class AnalysisResult(BaseModel):
     people: list[str]
     priorities: list[str]
     themes: list[str]
-    impactful_factors: list[dict] = []
 
 
 class IAudioStorage(Protocol):

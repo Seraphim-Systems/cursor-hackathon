@@ -84,10 +84,9 @@ class PeriodSummaryDocument(Document):
     end_date: str    # ISO YYYY-MM-DD
     
     summary: str
-    sentiment_trend: str
     key_achievements: list[str] = Field(default_factory=list)
     top_themes: list[str] = Field(default_factory=list)
-    significant_people: list[str] = Field(default_factory=list)
+    key_people: list[str] = Field(default_factory=list)
 
     last_entry_count: int = 0
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

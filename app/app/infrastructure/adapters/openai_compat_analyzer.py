@@ -18,18 +18,16 @@ logger = logging.getLogger(__name__)
 ANALYSIS_JSON_INSTRUCTIONS = """You analyze private journal entries. Return one JSON object only, no markdown.
 Keys (use null only where truly unknown):
 - summary: string, short paragraph
-- sentiment_score: number from -1 (very negative) to 1 (very positive)
 - key_points: string array
 - projects: array of { "name": string, "notes": string } for work/themes mentioned
 - goals: string array
 - blockers: string array
-- people: string array (names or roles)
+- people: string array (always use specific names if mentioned; avoid generic "friends" or "family")
 - priorities: string array
 - themes: string array (thematic labels)
-- impactful_factors: array of { "name": string, "impact": number (-1 to 1), "type": "person" | "topic" | "event" } 
-  Identify specific people, topics, or events mentioned that significantly influenced the author's mood/happiness in this entry.
 
-Be concise. If the entry is empty or noise, still return valid JSON with empty arrays and a short summary."""
+Be concise. Focus on topics, themes, and specific people. Avoid generic labels; if a specific name is mentioned, use it.
+If the entry is empty or noise, still return valid JSON with empty arrays and a short summary."""
 
 
 class OpenAiCompatAnalyzer:
@@ -96,12 +94,12 @@ class OpenAiCompatAnalyzer:
 
     async def analyze_trends(self, *, entries_data: list[dict]) -> dict:
         url = f"{self._base}/chat/completions"
-        system_msg = """You analyze multiple journal entry insights to find long-term trends. 
-Identify recurring events, people, or topics and how they correlate with sentiment (mood).
+        system_msg = """You analyze multiple journal entry insights to find long-term patterns and connections. 
+Identify recurring topics, themes, and people.
 Return one JSON object only:
-- summary: string, high-level overview of recent trends
-- findings: string array, specific patterns discovered (e.g., "Mondays are stressful due to X", "Seeing [Person] always boosts mood")
-- beneficial_actions: string array, suggestions for what might improve the user's wellbeing based on the data
+- summary: string, high-level overview of discovered patterns
+- findings: string array, specific connections discovered (e.g., "[Person] is often mentioned alongside [Topic]", "Recurring focus on [Theme] during weekdays")
+- beneficial_actions: string array, suggestions based on the identified patterns
 """
         payload: dict[str, Any] = {
             "model": self._model,
@@ -143,7 +141,6 @@ Return one JSON object only:
 def _payload_to_result(p: AIAnalysisPayload) -> AnalysisResult:
     return AnalysisResult(
         summary=(p.summary.strip() if isinstance(p.summary, str) and p.summary.strip() else None),
-        sentiment_score=p.sentiment_score,
         key_points=list(p.key_points),
         projects=[{"name": x.name, "notes": x.notes} for x in p.projects],
         goals=list(p.goals),
@@ -151,5 +148,4 @@ def _payload_to_result(p: AIAnalysisPayload) -> AnalysisResult:
         people=list(p.people),
         priorities=list(p.priorities),
         themes=list(p.themes),
-        impactful_factors=[{"name": x.name, "impact": x.impact, "type": x.factor_type} for x in p.impactful_factors],
     )
