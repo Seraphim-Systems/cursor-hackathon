@@ -7,7 +7,7 @@ export default function CalendarPage() {
   const [view, setView] = useState<"year" | "month" | "week" | "day">("year");
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // 1-12
-  const [selectedWeekStart, setSelectedWeekStart] = useState<string | null>(null);
+  const [selectedWeekStart] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const [summary, setSummary] = useState<PeriodSummary | null>(null);
