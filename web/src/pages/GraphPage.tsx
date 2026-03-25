@@ -1,21 +1,11 @@
-import { useEffect, useState } from "react";
-import { apiFetch } from "../api/client";
+import { useEffect, useMemo, useState } from "react";
+import { apiFetch, listEntries } from "../api/client";
+import type { JournalEntry } from "../api/types";
 
 type ImpactfulFactor = {
   name: string;
   impact: number;
   type: string;
-};
-
-type EntrySummary = {
-  id: string;
-  created_at: string;
-  sentiment_score: number | null;
-  insights?: {
-    themes?: string[];
-    key_points?: string[];
-    impactful_factors?: ImpactfulFactor[];
-  } | null;
 };
 
 type TrendsSummary = {
@@ -24,28 +14,147 @@ type TrendsSummary = {
   beneficial_actions: string[];
 };
 
+type InsightNode = {
+  id: string;
+  label: string;
+  kind: "center" | "category" | "theme" | "person" | "project" | "goal" | "blocker" | "priority";
+  count?: number;
+  x: number;
+  y: number;
+};
+
+type InsightEdge = {
+  from: string;
+  to: string;
+};
+
+function normToken(s: string): string {
+  return (s || "").replace(/\s+/g, " ").trim();
+}
+
+function tallyTokens(items: Array<string | null | undefined>): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const raw of items) {
+    const t = normToken(String(raw ?? ""));
+    if (!t) continue;
+    m.set(t, (m.get(t) ?? 0) + 1);
+  }
+  return m;
+}
+
+function topN(m: Map<string, number>, n: number): Array<{ label: string; count: number }> {
+  return Array.from(m.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
+    .slice(0, n);
+}
+
+function buildInsightsGraph(entries: JournalEntry[]): { nodes: InsightNode[]; edges: InsightEdge[] } {
+  const themes = tallyTokens(entries.flatMap((e) => e.insights?.themes ?? []));
+  const people = tallyTokens(entries.flatMap((e) => e.insights?.people ?? []));
+  const goals = tallyTokens(entries.flatMap((e) => e.insights?.goals ?? []));
+  const blockers = tallyTokens(entries.flatMap((e) => e.insights?.blockers ?? []));
+  const priorities = tallyTokens(entries.flatMap((e) => e.insights?.priorities ?? []));
+  const projects = tallyTokens(
+    entries.flatMap((e) => (e.insights?.projects ?? []).map((p) => p?.name).filter(Boolean)),
+  );
+
+  const topThemes = topN(themes, 12);
+  const topPeople = topN(people, 10);
+  const topProjects = topN(projects, 8);
+  const topGoals = topN(goals, 8);
+  const topBlockers = topN(blockers, 8);
+  const topPriorities = topN(priorities, 8);
+
+  const cx = 500;
+  const cy = 300;
+
+  const categories: Array<{
+    id: InsightNode["kind"];
+    label: string;
+    angleDeg: number;
+    items: Array<{ label: string; count: number; kind: InsightNode["kind"] }>;
+  }> = [
+    { id: "theme", label: "Themes", angleDeg: -90, items: topThemes.map((x) => ({ ...x, kind: "theme" })) },
+    { id: "person", label: "People", angleDeg: -30, items: topPeople.map((x) => ({ ...x, kind: "person" })) },
+    { id: "project", label: "Projects", angleDeg: 30, items: topProjects.map((x) => ({ ...x, kind: "project" })) },
+    { id: "goal", label: "Goals", angleDeg: 90, items: topGoals.map((x) => ({ ...x, kind: "goal" })) },
+    { id: "priority", label: "Priorities", angleDeg: 150, items: topPriorities.map((x) => ({ ...x, kind: "priority" })) },
+    { id: "blocker", label: "Blockers", angleDeg: 210, items: topBlockers.map((x) => ({ ...x, kind: "blocker" })) },
+  ];
+
+  const nodes: InsightNode[] = [{ id: "center:you", label: "You", kind: "center", x: cx, y: cy }];
+  const edges: InsightEdge[] = [];
+
+  const hubRadius = 170;
+  const itemRadius = 110;
+
+  for (const cat of categories) {
+    const a = (cat.angleDeg * Math.PI) / 180;
+    const hx = cx + Math.cos(a) * hubRadius;
+    const hy = cy + Math.sin(a) * hubRadius;
+    const hubId = `cat:${cat.id}`;
+    nodes.push({ id: hubId, label: cat.label, kind: "category", x: hx, y: hy });
+    edges.push({ from: "center:you", to: hubId });
+
+    const count = cat.items.length;
+    for (let i = 0; i < count; i++) {
+      const item = cat.items[i];
+      const spread = Math.min(Math.PI * 0.9, Math.PI * 0.25 + count * 0.06);
+      const offset = count === 1 ? 0 : (i / (count - 1) - 0.5) * spread;
+      const ia = a + offset;
+      const ix = hx + Math.cos(ia) * itemRadius;
+      const iy = hy + Math.sin(ia) * itemRadius;
+      const id = `${item.kind}:${item.label}`;
+      nodes.push({ id, label: item.label, kind: item.kind, count: item.count, x: ix, y: iy });
+      edges.push({ from: hubId, to: id });
+    }
+  }
+
+  return { nodes, edges };
+}
+
 export default function GraphPage() {
-  const [entries, setEntries] = useState<EntrySummary[]>([]);
+  const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [trendsSummary, setTrendsSummary] = useState<TrendsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingTrends, setLoadingTrends] = useState(true);
+  const [tab, setTab] = useState<"trends" | "insights_graph">("trends");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<{ items: EntrySummary[] }>("/api/entries?limit=100")
+    listEntries(200, 0)
       .then((data) => {
         const sorted = data.items.sort((a, b) => 
           new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         );
         setEntries(sorted);
       })
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "Failed to load entries");
+      })
       .finally(() => setLoading(false));
 
     apiFetch<TrendsSummary>("/api/entries/trends/summary")
       .then((data) => setTrendsSummary(data))
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : "Failed to load trends");
+      })
       .finally(() => setLoadingTrends(false));
   }, []);
 
-  if (loading) return <div className="page-shell"><p>Loading trends...</p></div>;
+  if (loading) return <div className="page-shell"><p>Loading insights…</p></div>;
+
+  if (error) {
+    return (
+      <div className="page-shell stack-lg" style={{ maxWidth: "1200px", margin: "0 auto" }}>
+        <h2 className="page-title">Insights</h2>
+        <p className="text-error" role="alert" style={{ margin: 0 }}>
+          {error}
+        </p>
+      </div>
+    );
+  }
 
   // Filter entries with sentiment score
   const trendData = entries.filter(e => e.sentiment_score !== null);
@@ -53,7 +162,7 @@ export default function GraphPage() {
   // Aggregate themes
   const themeCounts: Record<string, number> = {};
   entries.forEach(e => {
-    e.insights?.themes?.forEach(t => {
+    (e.insights?.themes ?? []).forEach(t => {
       themeCounts[t] = (themeCounts[t] || 0) + 1;
     });
   });
@@ -61,13 +170,175 @@ export default function GraphPage() {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 15);
 
+  const insightGraph = useMemo(() => buildInsightsGraph(entries), [entries]);
+
   return (
     <div className="page-shell stack-lg" style={{ maxWidth: "1200px", margin: "0 auto" }}>
       <header className="stack-sm">
-        <h2 className="page-title">Emotional Trends & AI Insights</h2>
-        <p className="muted">Visualize your mood over time and discover what influences your happiness.</p>
+        <h2 className="page-title">Insights</h2>
+        <p className="muted">Explore your emotional trends and the themes, people, and projects you talk about most.</p>
       </header>
 
+      <nav
+        aria-label="Insights tabs"
+        style={{
+          display: "flex",
+          gap: "0.5rem",
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <button
+          type="button"
+          className={tab === "trends" ? "btn-gold" : "btn-ghost"}
+          style={{ padding: "0.4rem 0.9rem", fontSize: "0.9rem" }}
+          onClick={() => setTab("trends")}
+          aria-current={tab === "trends" ? "page" : undefined}
+        >
+          Trends
+        </button>
+        <button
+          type="button"
+          className={tab === "insights_graph" ? "btn-gold" : "btn-ghost"}
+          style={{ padding: "0.4rem 0.9rem", fontSize: "0.9rem" }}
+          onClick={() => setTab("insights_graph")}
+          aria-current={tab === "insights_graph" ? "page" : undefined}
+        >
+          Insights graph
+        </button>
+      </nav>
+
+      {tab === "insights_graph" ? (
+        <section className="ui-card stack-lg" style={{ padding: "1.5rem", border: "1px solid var(--color-border-strong)" }}>
+          <div className="stack-sm">
+            <h3 style={{ margin: 0, color: "var(--color-accent)" }}>Insights Graph</h3>
+            <p className="muted" style={{ margin: 0 }}>
+              A quick “map” of your most common insights. Hover nodes to see counts.
+            </p>
+          </div>
+
+          {entries.length === 0 ? (
+            <div className="empty-state" style={{ padding: "2rem" }}>
+              <p style={{ margin: 0 }}>No entries yet.</p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1.25rem" }} className="graph-layout">
+              <style>{`
+                @media (min-width: 980px) {
+                  .graph-layout {
+                    grid-template-columns: 1fr 320px !important;
+                  }
+                }
+              `}</style>
+
+              <div style={{ overflowX: "auto" }}>
+                <svg
+                  width="100%"
+                  height="560"
+                  viewBox="0 0 1000 600"
+                  role="img"
+                  aria-label="Insights graph"
+                  style={{
+                    minWidth: "760px",
+                    background: "linear-gradient(165deg, var(--color-complement-muted) 0%, var(--color-bg-elevated) 100%)",
+                    borderRadius: "var(--radius-lg)",
+                    border: "1px solid var(--color-border-strong)",
+                  }}
+                >
+                  {/* edges */}
+                  {insightGraph.edges.map((e, i) => {
+                    const a = insightGraph.nodes.find((n) => n.id === e.from);
+                    const b = insightGraph.nodes.find((n) => n.id === e.to);
+                    if (!a || !b) return null;
+                    return (
+                      <line
+                        key={i}
+                        x1={a.x}
+                        y1={a.y}
+                        x2={b.x}
+                        y2={b.y}
+                        stroke="var(--color-border)"
+                        strokeWidth={2}
+                        opacity={0.7}
+                      />
+                    );
+                  })}
+
+                  {/* nodes */}
+                  {insightGraph.nodes.map((n) => {
+                    const isCenter = n.kind === "center";
+                    const isCategory = n.kind === "category";
+                    const r = isCenter ? 26 : isCategory ? 18 : 12 + Math.min(10, Math.floor((n.count ?? 1) / 2));
+                    const fill =
+                      isCenter ? "var(--color-accent)" :
+                      isCategory ? "var(--color-accent-muted)" :
+                      "var(--color-surface)";
+                    const stroke =
+                      isCenter ? "var(--color-bg-elevated)" :
+                      isCategory ? "var(--color-accent)" :
+                      "var(--color-border-strong)";
+                    const textColor = isCenter ? "var(--color-bg)" : "var(--color-text)";
+                    const label = n.label.length > 18 ? `${n.label.slice(0, 17)}…` : n.label;
+
+                    return (
+                      <g key={n.id}>
+                        <circle cx={n.x} cy={n.y} r={r} fill={fill} stroke={stroke} strokeWidth={3} opacity={0.95}>
+                          <title>
+                            {n.kind === "category"
+                              ? n.label
+                              : n.count != null
+                                ? `${n.label} (${n.count})`
+                                : n.label}
+                          </title>
+                        </circle>
+                        <text
+                          x={n.x}
+                          y={n.y + 4}
+                          textAnchor="middle"
+                          fontSize={isCenter ? 13 : isCategory ? 12 : 10}
+                          fontWeight={isCenter || isCategory ? 800 : 600}
+                          fill={textColor}
+                          style={{ pointerEvents: "none" }}
+                        >
+                          {isCenter || isCategory ? label : ""}
+                        </text>
+                        {!isCenter && !isCategory ? (
+                          <text
+                            x={n.x}
+                            y={n.y + r + 14}
+                            textAnchor="middle"
+                            fontSize={11}
+                            fontWeight={650}
+                            fill="var(--color-text)"
+                            style={{ pointerEvents: "none" }}
+                          >
+                            {label}
+                          </text>
+                        ) : null}
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+
+              <aside className="ui-card stack-lg" style={{ padding: "1.25rem", border: "1px solid var(--color-border)" }}>
+                <h4 style={{ margin: 0, fontSize: "0.95rem" }}>What’s included</h4>
+                <ul style={{ margin: 0, paddingLeft: "1.2rem" }} className="stack-sm">
+                  <li><span className="muted">Themes, people, projects, goals, blockers, priorities</span></li>
+                  <li><span className="muted">Counts are based on your last {Math.min(200, entries.length)} entries loaded</span></li>
+                </ul>
+                <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "0.9rem" }} className="stack-md">
+                  <p className="muted" style={{ margin: 0 }}>
+                    Tip: If something looks off, re-run analysis on entries from the entry detail page.
+                  </p>
+                </div>
+              </aside>
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {tab === "trends" ? (
       <div style={{ 
         display: "grid", 
         gridTemplateColumns: "1fr",
@@ -340,6 +611,7 @@ export default function GraphPage() {
           </div>
         </section>
       </div>
+      ) : null}
     </div>
   );
 }
