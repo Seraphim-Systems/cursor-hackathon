@@ -145,7 +145,7 @@ export function HistoryPage() {
 
   /**
    * Open day panels when: keyword search (optional short date window), or date-only with inclusive range ≤ 7 days.
-   * Content filters (audio, transcript, …), partial dates, or a range longer than 7 days → stay packed.
+   * Content filters (text / summary / …), partial dates, or a range longer than 7 days → stay packed.
    */
   const shouldAutoExpandFilteredDays = useMemo(() => {
     if (filteredEntries.length === 0) return false;

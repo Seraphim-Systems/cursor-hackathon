@@ -2113,6 +2113,98 @@ a.btn-gold.btn-gold--outline:hover,
   box-shadow: 0 1px 2px rgba(28, 25, 20, 0.035), 0 10px 30px rgba(28, 25, 20, 0.06);
 }
 
+/* History / archive — cards used a dark-only gradient; light theme needs paper surfaces + readable text */
+:root[data-theme="light"] .archive-recording-card {
+  background: linear-gradient(165deg, #fffefb 0%, #f4efe6 55%, #ebe4d8 100%);
+  border: 1px solid rgba(38, 32, 24, 0.12);
+  box-shadow:
+    0 1px 2px rgba(28, 25, 20, 0.05),
+    0 8px 28px rgba(28, 25, 20, 0.07);
+}
+
+:root[data-theme="light"] .archive-recording-card:hover {
+  border-color: rgba(159, 119, 32, 0.38);
+  box-shadow:
+    0 2px 8px rgba(28, 25, 20, 0.06),
+    0 14px 40px rgba(82, 58, 130, 0.1),
+    0 0 0 1px rgba(82, 58, 130, 0.07);
+}
+
+:root[data-theme="light"] .archive-recording-card__title-link {
+  color: #141210;
+}
+
+:root[data-theme="light"] .archive-recording-card__title-link:hover {
+  color: var(--color-accent-dim);
+}
+
+:root[data-theme="light"] .archive-recording-card__preview {
+  color: #3d3830;
+}
+
+:root[data-theme="light"] .archive-recording-card__meta,
+:root[data-theme="light"] .archive-recording-card__duration {
+  color: #524c42;
+}
+
+:root[data-theme="light"] .archive-recording-card__audio {
+  border-top-color: rgba(38, 32, 24, 0.1);
+}
+
+:root[data-theme="light"] .archive-recording-card__menu-trigger:hover {
+  background: rgba(159, 119, 32, 0.12);
+  border-color: rgba(159, 119, 32, 0.22);
+}
+
+:root[data-theme="light"] .archive-month__heading {
+  color: #3f3a32;
+  border-bottom-color: rgba(38, 32, 24, 0.12);
+}
+
+:root[data-theme="light"] .archive-day-group__trigger:hover {
+  background: rgba(159, 119, 32, 0.1);
+}
+
+:root[data-theme="light"] .archive-day-group__chev {
+  border-right-color: #6b6458;
+  border-bottom-color: #6b6458;
+  opacity: 0.95;
+}
+
+:root[data-theme="light"] .archive-day-group__count {
+  color: #524c42;
+}
+
+:root[data-theme="light"] .archive-toolbar__search {
+  background: #fffefb;
+  border-color: rgba(38, 32, 24, 0.14);
+  box-shadow: inset 0 1px 2px rgba(28, 25, 20, 0.03);
+}
+
+:root[data-theme="light"] .archive-toolbar__search:hover {
+  border-color: rgba(159, 119, 32, 0.35);
+}
+
+:root[data-theme="light"] .archive-toolbar__search:focus-visible {
+  box-shadow: 0 0 0 3px rgba(159, 119, 32, 0.22);
+}
+
+:root[data-theme="light"] .archive-summary {
+  color: #524c42;
+}
+
+:root[data-theme="light"] .archive-summary__n {
+  color: #141210;
+}
+
+:root[data-theme="light"] .archive-header__subtitle {
+  color: #3d3830;
+}
+
+:root[data-theme="light"] .archive-header__tz {
+  color: var(--color-accent-dim);
+}
+
 /* Toast after save on Record page */
 .toast-alert {
   position: fixed;
@@ -3138,8 +3230,17 @@ a.btn-gold.btn-gold--outline:hover,
 }
 
 .journal-audio--archive .journal-audio__scrub-played {
-  background: linear-gradient(90deg, rgba(201, 162, 39, 0.35), rgba(201, 162, 39, 0.75));
-  box-shadow: none;
+  background: linear-gradient(
+    90deg,
+    #fff6cc 0%,
+    #ffe566 18%,
+    #e8c13a 52%,
+    #f0d878 100%
+  );
+  box-shadow:
+    0 0 18px rgba(255, 214, 90, 0.55),
+    0 0 8px rgba(201, 162, 39, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .journal-audio--archive .journal-audio__times {
@@ -3196,6 +3297,80 @@ a.btn-gold.btn-gold--outline:hover,
   border-color: rgba(201, 162, 39, 0.35);
   color: var(--color-accent);
   box-shadow: 0 0 0 2px rgba(201, 162, 39, 0.1);
+}
+
+/* History archive — while playing: luminous chrome on the play control + soft bar glow */
+.journal-audio--archive.journal-audio--playing {
+  border-color: rgba(201, 162, 39, 0.38);
+  box-shadow:
+    0 0 0 1px rgba(255, 220, 120, 0.12),
+    0 6px 28px rgba(201, 162, 39, 0.14);
+}
+
+.journal-audio--archive.journal-audio--playing .journal-audio__scrub-visual {
+  border-color: rgba(201, 162, 39, 0.32);
+}
+
+.app-main .journal-audio.journal-audio--archive.journal-audio--playing .journal-audio__play {
+  color: #14110d;
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 252, 235, 0.95) 0%, transparent 52%),
+    linear-gradient(150deg, #fff2a8 0%, #e8bd2e 42%, #c9a227 78%, #a67f18 100%);
+  border: 1px solid rgba(255, 236, 160, 0.95);
+  box-shadow:
+    0 0 22px rgba(255, 210, 80, 0.55),
+    0 4px 14px rgba(201, 162, 39, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.app-main .journal-audio.journal-audio--archive.journal-audio--playing .journal-audio__play:hover:not(:disabled) {
+  color: #0d0b09;
+  border-color: #fff;
+  box-shadow:
+    0 0 28px rgba(255, 220, 120, 0.65),
+    0 6px 18px rgba(201, 162, 39, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+:root[data-theme="light"] .journal-audio--archive {
+  background: linear-gradient(165deg, rgba(255, 253, 248, 0.97) 0%, rgba(245, 238, 226, 0.98) 100%);
+  border-color: rgba(159, 119, 32, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+:root[data-theme="light"] .journal-audio--archive .journal-audio__scrub-visual {
+  background: rgba(28, 25, 20, 0.07);
+  border-color: rgba(159, 119, 32, 0.22);
+}
+
+:root[data-theme="light"] .journal-audio--archive .journal-audio__scrub-played {
+  background: linear-gradient(
+    90deg,
+    #fff9e6 0%,
+    #ffd54a 28%,
+    #f0b429 58%,
+    #ffe08a 100%
+  );
+  box-shadow:
+    0 0 14px rgba(255, 193, 7, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+:root[data-theme="light"] .journal-audio--archive.journal-audio--playing {
+  border-color: rgba(159, 119, 32, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 0 0 1px rgba(255, 200, 80, 0.2),
+    0 8px 26px rgba(159, 119, 32, 0.12);
+}
+
+:root[data-theme="light"] .app-main .journal-audio.journal-audio--archive.journal-audio--playing .journal-audio__play {
+  color: #1c1508;
+  border-color: rgba(255, 220, 130, 0.9);
+  box-shadow:
+    0 0 20px rgba(255, 200, 60, 0.45),
+    0 4px 12px rgba(159, 119, 32, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .history-filter-modal__hint {

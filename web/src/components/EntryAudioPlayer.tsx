@@ -337,12 +337,13 @@ export function EntryAudioPlayer({ entryId, compact, variant, onDurationKnown }:
   const max = isValidDuration(duration) ? duration : 0;
   const safeCurrent = max > 0 ? Math.min(current, max) : current;
 
-  const audioClass =
+  const layoutClass =
     layoutVariant === "archive"
       ? "journal-audio journal-audio--archive"
       : layoutVariant === "compact"
         ? "journal-audio journal-audio--compact"
         : "journal-audio";
+  const audioClass = [layoutClass, playing ? "journal-audio--playing" : ""].filter(Boolean).join(" ");
 
   return (
     <div className={audioClass}>
